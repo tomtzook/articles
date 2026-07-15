@@ -41,7 +41,9 @@ An example for this would be the `lgdt` instruction, part of the x86 architectur
 
 However, not all _ISA_ fit these requirements. _x86_ is actually at fault as well. It features several **sensetive** instructions which are not **privileged**. One of these is `sgdt`, which reads the _GDT_. Considering the fact the we chose what _GDT_ to place when doing `lgdt`, the call to `sgdt` will allow the user to see the _real GDT_ instead of the one it thinks it loaded. This is a functional problem at its core, since the OS will expect a very specific _GDT_ and may not handle it properly when a different _GDT_ is retreived, breaking the **Equivalence** requirement.
 
-Altering our approach, we could use an _interpreter_ to translate and catch all **sensetive** instructions and replacing them with a trap, or shadow structure when necessary. An example for this was done by _VMWare_, where they used _binary translation_ to translate the guest code so as to enable proper virtualization with x86.
+Altering our approach, we could use an _interpreter_ to translate and catch all **sensetive** instructions and replacing them with a trap, or shadow structure when necessary. An example for this was done by _VMWare_, where they used _binary translation_ to translate the guest code so as to enable proper virtualization with x86. We would refer to this as _Software Virtualization_.
+
+We could takle `sgdt` as an example. Since this is a **sensetive** but non-privileged instruction, we must address it manually to acheive proper virtualization. When cosidering a translation approach, we may translate `sgdt eax` instruction into `mov eax, 0x0ff123`, where `0x0ff123` is the address of the "fake" _GDTR_ the guest is expecting. Thus the guest received the information it expected.
 
 ### Intel VT-x
 
