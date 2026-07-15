@@ -32,8 +32,9 @@ If following _Popek and Goldberg_ Theorem 1, we can define an architecture as vi
 - **Privileged** instructions cause a **trap** (e.g. an interrupt).
 
 This leads to the _trap-and-emulate_ approach (also called _classic virtualization_) 
-- When **non-sensetive** instructions execute in the _VM_, they cause a **trap**. This is because they are **privileged** instructions executed in a non previleged environment.
+- When **sensetive** instructions execute in the _VM_, they cause a **trap**. This is because they are **privileged** instructions executed in a non previleged environment.
 - This **trap** leads to the _VMM_, which emulates the instruction and returns to the guest.
+- **non-sensetive** instructions are just executed by the hardware as is.
 
 We would call this _Hardware-Assisted Virtualization_, since it depends on the hardware providing the **trap** via its architectural behavior.
 
