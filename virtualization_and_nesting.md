@@ -6,7 +6,7 @@ The concept of creating several _simulated_ and _isolated_ environment on top of
 
 This was meant to be done with a _Virtual Machine Monitor_ (_VMM_ or _hypervisor_) which would control and simulate real hardware to a set of _Virtual Machine_, each thinking it is the only one existing on the hardware.
 
-Although interest waned at first **TODO WHY**, the increase in hardware capacity on a single machine rekindled interest in the concept, especially as a base for the implementation of cloud computing.
+Although interest waned at first, but the increase in hardware capacity on a single machine rekindled interest in the concept, especially as a base for the implementation of cloud computing.
 
 _Popek and Goldberg_ in their _Formal Requirements for Virtualizable Third Generation Architectures_ defined that virtualization must provide
 - **Equivalence**: a program running under a _VMM_ should behave in an essentially identical manner to one running on real hardware. Any effects on behavior introduced by virtualization would essentially render it non-viable for wide spread use.
@@ -20,11 +20,13 @@ It can be pretty intuative to compare the architecture of _VMM_ and their relati
 
 <img width="739" height="252" alt="image" src="https://github.com/user-attachments/assets/5de57122-2e42-426d-8ab3-7f980a40aba5" />
 
-Essentially then, one can look at virtualization, as a means to multiplex a system to different users. This is what allows cloud computing to function, with a _VMM_ on a single server, running several _VM_ and ensuring they are isolated from one another.
+Essentially then, one can look at virtualization, as a means to multiplex a system to different users. This is what allows cloud computing to function, with a _VMM_ on a single server, running several _VM_ and ensuring they are isolated from one another. It is thus paramount for the _VMM_ to ensure that the virtualized hardware acts in a manner fitting the expectation of the _VM_. 
 
 Although recently, it has seen more and more applications for security of a machine, with the realization that the _kernel_ was not actually secure, some companies started pushing security mechanism one level lower, into an _hypervisor_. Microsoft's _Hyper-V_ and _Virtualization Based Security_ are prime examples.
 
 ## Virtualization Techniques
+
+### Hardware-Assisted Virtualization
 
 If following _Popek and Goldberg_ Theorem 1, we can define an architecture as virtualizable if
 - Most instructions, labeled as **non-sensetive** (i.e. no direct hardware resource configuration, like `add` or `mov`) will execute directly on the processor.
@@ -40,12 +42,256 @@ We would call this _Hardware-Assisted Virtualization_, since it depends on the h
 
 An example for this would be the `lgdt` instruction, part of the x86 architecture. This instruction seeks to load a new _Global Descriptor Table_ into the processor. We would consider this instruction as **sensetive**, as it affects the behavior of memory access. In reality, we may not want the provided _GDT_ to be the real one. Luckily, `lgdt` is a privileged instruction, so its execution by the guest _VM_ will yield an _interrupt_ (`#GP(0)`). Our _VMM_ will receive this interrupt and choose what to really load.
 
+From this example, one could understand that there may be a need for shadow structures. These structures are derived from the guest's structures (like _Page Tables_ and _Global Descriptor Table_). The guest may seek a specific memory mapping with physical memory, but because of the presence of more _VM_, the _VMM_ cannot give it free reign in mapping the physical memory. This would then require the _VMM_ to intercept the guest _Page Table_ and load another one in reality that can service all the present _VM_. This requires use of hardware page protection mechanism. This can be used to trap specific memory accesses that require emulation. Among these are _memory-mapped IO_ operations and hardware structure modification. When the guest modifies its _Page Table_, the _VMM_ must react appropriately to provide the guest with the expected virtual addresses. It would thus have to use page protection to force traps when the guest modifies its _Page Table_.
+
+### Software Virtualization
+
 However, not all _ISA_ fit these requirements. _x86_ is actually at fault as well. It features several **sensetive** instructions which are not **privileged**. One of these is `sgdt`, which reads the _GDT_. Considering the fact the we chose what _GDT_ to place when doing `lgdt`, the call to `sgdt` will allow the user to see the _real GDT_ instead of the one it thinks it loaded. This is a functional problem at its core, since the OS will expect a very specific _GDT_ and may not handle it properly when a different _GDT_ is retreived, breaking the **Equivalence** requirement.
 
 Altering our approach, we could use an _interpreter_ to translate and catch all **sensetive** instructions and replacing them with a trap, or shadow structure when necessary. An example for this was done by _VMWare_, where they used _binary translation_ to translate the guest code so as to enable proper virtualization with x86. We would refer to this as _Software Virtualization_.
 
-We could takle `sgdt` as an example. Since this is a **sensetive** but non-privileged instruction, we must address it manually to acheive proper virtualization. When cosidering a translation approach, we may translate `sgdt eax` instruction into `mov eax, 0x0ff123`, where `0x0ff123` is the address of the "fake" _GDTR_ the guest is expecting. Thus the guest received the information it expected.
+We could tackle `sgdt` as an example. Since this is a **sensetive** but non-privileged instruction, we must address it manually to acheive proper virtualization. When cosidering a translation approach, we may translate `sgdt eax` instruction into `mov eax, 0x0ff123`, where `0x0ff123` is the address of the "fake" _GDTR_ the guest is expecting. Thus the guest received the information it expected.
 
 ### Intel VT-x
+
+To address the problems with virtualization in _x86_ both _Intel_ and _AMD_ released extensions to the architectures to fascilitate full hardware-assisted virtualization. For _Intel_, this came in the form of _VT-x_.
+
+When in virtualization mode, the x86 processor as two new operating modes:
+- **root**: the _VMM_, esentially the new **privileged** mode.
+- **non-root**: the _guest_.
+
+When in **non-root** mode, certain instructions now trigger special virtualization behavior. This can come in the form of a **trap** (called **vmexit**), or a unique hardware behavior emulating real hardware behavior. Unlike previous _trap-and-emulate_ in x86, the hardware takes much more of the load, and what is considered **sensetive** has changed. 
+
+The processor uses the _Virtual Machine Control Structure_ to allow the _VMM_ to define virtualization behavior with the guest. Providing more find-grained control, while leveraging new hardware circuits to limit the need for the _VMM_ to perform emulation manually.
+
+One example for this is the new _Extended Page Tables_ added with the _Nehalem_ microarchitecture. This is an extension to the standard _Page Table_ and is integrated directly with the _MMU_. _VMM_ can use this to define the true virtual-physical memory mapping for each _guest_, removing the need to trace _Page Table_ modification in the guest. 
+
+Thus, virtualization is done in two ways:
+- hardware assisted emulation, including things like APIC and IO virtualization. These are configured in the _VMCS_ by the _VMM_ before executing the guest.
+- software emulation, in response to **vmexit**, essentially specific **trap** triggered when _VT-x_ is unable to emulate on its own with hardware (or specifically configured not to do so). Including things like _MSR_ and _CR_ access.
+
+The following is the list of all **vmexit** reasons:
+```
+    exception_or_nmi = 0,
+    external_interrupt = 1,
+    triple_fault = 2,
+    init_signal = 3,
+    startup_ipi = 4,
+    io_smm_interrupt = 5,
+    other_smi = 6,
+    interrupt_window = 7,
+    nmi_windows = 8,
+    task_switch = 9,
+    cpuid = 10,
+    getsec = 11,
+    hlt = 12,
+    invd = 13,
+    invlpg = 14,
+    rdpmc = 15,
+    rdtsc = 16,
+    rsm = 17,
+    vmcall = 18,
+    vmclear = 19,
+    vmlaunch = 20,
+    vmptrld = 21,
+    vmptrst = 22,
+    vmread = 23,
+    vmresume = 24,
+    vmwrite = 25,
+    vmxoff = 26,
+    vmxon = 27,
+    cr_access = 28,
+    mov_dr = 29,
+    io = 30,
+    rdmsr = 31,
+    wrmsr = 32,
+    vmentry_invalid_guest_state = 33,
+    vmentry_msr_load_failure = 34,
+    mwait = 36,
+    monitor_trap_flag = 37,
+    monitor = 39,
+    pause = 40,
+    vmentry_machine_check = 41,
+    tpr_below_threshold = 43,
+    apic_access = 44,
+    virtualized_eoi = 45,
+    access_gdtr_idtr = 46,
+    access_ldtr_tr = 47,
+    ept_violation = 48,
+    ept_misconfiguration = 49,
+    invept = 50,
+    rdtscp = 51,
+    vmx_preemption_timer_expired = 52,
+    invvpid = 53,
+    wbinvd = 54,
+    xsetbv = 55,
+    apic_write = 56,
+    rdrand = 57,
+    invpcid = 58,
+    vmfunc = 59,
+    encls = 60,
+    rdseed = 61,
+    page_mod_log_full = 62,
+    xsaves = 63,
+    xrstors = 64,
+```
+
+The following are the fields in the _VMCS_:
+```
+    ctrl_virtual_processor_identifier = 0x0,
+    ctrl_posted_interrupt_notification_vector = 0x2,
+    ctrl_eptp_index = 0x4,
+    guest_es_selector = 0x800,
+    guest_cs_selector = 0x802,
+    guest_ss_selector = 0x804,
+    guest_ds_selector = 0x806,
+    guest_fs_selector = 0x808,
+    guest_gs_selector = 0x80a,
+    guest_ldtr_selector = 0x80c,
+    guest_tr_selector = 0x80e,
+    guest_interrupt_status = 0x810,
+    guest_pml_index = 0x812,
+    host_es_selector = 0xc00,
+    host_cs_selector = 0xc02,
+    host_ss_selector = 0xc04,
+    host_ds_selector = 0xc06,
+    host_fs_selector = 0xc08,
+    host_gs_selector = 0xc0a,
+    host_tr_selector = 0xc0c,
+    ctrl_io_bitmap_a_address = 0x2000,
+    ctrl_io_bitmap_b_address = 0x2002,
+    ctrl_msr_bitmap_address = 0x2004,
+    ctrl_vmexit_msr_store_address = 0x2006,
+    ctrl_vmexit_msr_load_address = 0x2008,
+    ctrl_vmentry_msr_load_address = 0x200a,
+    ctrl_executive_pointer = 0x200c,
+    ctrl_pml_address = 0x200e,
+    ctrl_tsc_offset = 0x2010,
+    ctrl_virtual_apic_address = 0x2012,
+    ctrl_apic_access_address = 0x2014,
+    ctrl_posted_interrupt_descriptor_address = 0x2016,
+    ctrl_vmfunc_controls = 0x2018,
+    ctrl_ept_pointer = 0x201a,
+    ctrl_eoi_exit_bitmap_0 = 0x201c,
+    ctrl_eoi_exit_bitmap_1 = 0x201e,
+    ctrl_eoi_exit_bitmap_2 = 0x2020,
+    ctrl_eoi_exit_bitmap_3 = 0x2022,
+    ctrl_ept_pointer_list_address = 0x2024,
+    ctrl_vmread_bitmap_address = 0x2026,
+    ctrl_vmwrite_bitmap_address = 0x2028,
+    ctrl_virtualization_exception_information_address = 0x202a,
+    ctrl_xss_exiting_bitmap = 0x202c,
+    ctrl_encls_exiting_bitmap = 0x202e,
+    ctrl_tsc_multiplier = 0x2032,
+    guest_physical_address = 0x2400,
+    guest_link_pointer = 0x2800,
+    guest_debugctl = 0x2802,
+    guest_pat = 0x2804,
+    guest_efer = 0x2806,
+    guest_perf_global_ctrl = 0x2808,
+    guest_pdpte0 = 0x280a,
+    guest_pdpte1 = 0x280c,
+    guest_pdpte2 = 0x280e,
+    guest_pdpte3 = 0x2810,
+    host_pat = 0x2c00,
+    host_efer = 0x2c02,
+    host_perf_global_ctrl = 0x2c04,
+    ctrl_pin_based_vm_execution_controls = 0x4000,
+    ctrl_processor_based_vm_execution_controls = 0x4002,
+    ctrl_exception_bitmap = 0x4004,
+    ctrl_pagefault_error_code_mask = 0x4006,
+    ctrl_pagefault_error_code_match = 0x4008,
+    ctrl_cr3_target_count = 0x400a,
+    ctrl_vmexit_controls = 0x400c,
+    ctrl_vmexit_msr_store_count = 0x400e,
+    ctrl_vmexit_msr_load_count = 0x4010,
+    ctrl_vmentry_controls = 0x4012,
+    ctrl_vmentry_msr_load_count = 0x4014,
+    ctrl_vmentry_interruption_information_field = 0x4016,
+    ctrl_vmentry_exception_error_code = 0x4018,
+    ctrl_vmentry_instruction_length = 0x401a,
+    ctrl_tpr_threshold = 0x401c,
+    ctrl_secondary_processor_based_vm_execution_controls = 0x401e,
+    ctrl_ple_gap = 0x4020,
+    ctrl_ple_window = 0x4022,
+    vm_instruction_error = 0x4400,
+    exit_reason = 0x4402,
+    vmexit_interruption_information = 0x4404,
+    vmexit_interruption_error_code = 0x4406,
+    idt_vectoring_information = 0x4408,
+    idt_vectoring_error_code = 0x440a,
+    vmexit_instruction_length = 0x440c,
+    vmexit_instruction_info = 0x440e,
+    guest_es_limit = 0x4800,
+    guest_cs_limit = 0x4802,
+    guest_ss_limit = 0x4804,
+    guest_ds_limit = 0x4806,
+    guest_fs_limit = 0x4808,
+    guest_gs_limit = 0x480a,
+    guest_ldtr_limit = 0x480c,
+    guest_tr_limit = 0x480e,
+    guest_gdtr_limit = 0x4810,
+    guest_idtr_limit = 0x4812,
+    guest_es_access_rights = 0x4814,
+    guest_cs_access_rights = 0x4816,
+    guest_ss_access_rights = 0x4818,
+    guest_ds_access_rights = 0x481a,
+    guest_fs_access_rights = 0x481c,
+    guest_gs_access_rights = 0x481e,
+    guest_ldtr_access_rights = 0x4820,
+    guest_tr_access_rights = 0x4822,
+    guest_interruptibility_state = 0x4824,
+    guest_activity_state = 0x4826,
+    guest_smbase = 0x4828,
+    guest_sysenter_cs = 0x482a,
+    guest_vmx_preemption_timer_value = 0x482e,
+    sysenter_cs = 0x4c00,
+    ctrl_cr0_guest_host_mask = 0x6000,
+    ctrl_cr4_guest_host_mask = 0x6002,
+    ctrl_cr0_read_shadow = 0x6004,
+    ctrl_cr4_read_shadow = 0x6006,
+    ctrl_cr3_target_value_0 = 0x6008,
+    ctrl_cr3_target_value_1 = 0x600a,
+    ctrl_cr3_target_value_2 = 0x600c,
+    ctrl_cr3_target_value_3 = 0x600e,
+    exit_qualification = 0x6400,
+    io_rcx = 0x6402,
+    io_rsx = 0x6404,
+    io_rdi = 0x6406,
+    io_rip = 0x6408,
+    exit_guest_linear_address = 0x640a,
+    guest_cr0 = 0x6800,
+    guest_cr3 = 0x6802,
+    guest_cr4 = 0x6804,
+    guest_es_base = 0x6806,
+    guest_cs_base = 0x6808,
+    guest_ss_base = 0x680a,
+    guest_ds_base = 0x680c,
+    guest_fs_base = 0x680e,
+    guest_gs_base = 0x6810,
+    guest_ldtr_base = 0x6812,
+    guest_tr_base = 0x6814,
+    guest_gdtr_base = 0x6816,
+    guest_idtr_base = 0x6818,
+    guest_dr7 = 0x681a,
+    guest_rsp = 0x681c,
+    guest_rip = 0x681e,
+    guest_rflags = 0x6820,
+    guest_pending_debug_exceptions = 0x6822,
+    guest_sysenter_esp = 0x6824,
+    guest_sysenter_eip = 0x6826,
+    host_cr0 = 0x6c00,
+    host_cr3 = 0x6c02,
+    host_cr4 = 0x6c04,
+    host_fs_base = 0x6c06,
+    host_gs_base = 0x6c08,
+    host_tr_base = 0x6c0a,
+    host_gdtr_base = 0x6c0c,
+    host_idtr_base = 0x6c0e,
+    host_sysenter_esp = 0x6c10,
+    host_sysenter_eip = 0x6c12,
+    host_rsp = 0x6c14,
+    host_rip = 0x6c16
+```
 
 ## Nesting
