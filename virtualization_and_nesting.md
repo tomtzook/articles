@@ -294,4 +294,12 @@ The following are the fields in the _VMCS_:
     host_rip = 0x6c16
 ```
 
+The following is a simplified the demonstration of a _VMM_ lifecycle
+
+<img width="556" height="641" alt="image" src="https://github.com/user-attachments/assets/c5c5002b-ab65-46ff-b524-d86a01cfd130" />
+
+The following shows the processor reaction to a guest trying to read an _MSR_ with _VT-x_
+
+<img width="490" height="491" alt="image" src="https://github.com/user-attachments/assets/65532ba2-a633-4567-b44f-46833ac5c57d" />
+
 ## Nesting
