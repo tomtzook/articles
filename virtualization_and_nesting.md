@@ -40,3 +40,9 @@ We would call this _Hardware-Assisted Virtualization_, since it depends on the h
 An example for this would be the `lgdt` instruction, part of the x86 architecture. This instruction seeks to load a new _Global Descriptor Table_ into the processor. We would consider this instruction as **sensetive**, as it affects the behavior of memory access. In reality, we may not want the provided _GDT_ to be the real one. Luckily, `lgdt` is a privileged instruction, so its execution by the guest _VM_ will yield an _interrupt_ (`#GP(0)`). Our _VMM_ will receive this interrupt and choose what to really load.
 
 However, not all _ISA_ fit these requirements. _x86_ is actually at fault as well. It features several **sensetive** instructions which are not **privileged**. One of these is `sgdt`, which reads the _GDT_. Considering the fact the we chose what _GDT_ to place when doing `lgdt`, the call to `sgdt` will allow the user to see the _real GDT_ instead of the one it thinks it loaded. This is a functional problem at its core, since the OS will expect a very specific _GDT_ and may not handle it properly when a different _GDT_ is retreived, breaking the **Equivalence** requirement.
+
+Altering our approach, we could use an _interpreter_ to translate and catch all **sensetive** instructions and replacing them with a trap, or shadow structure when necessary. An example for this was done by _VMWare_, where they used _binary translation_ to translate the guest code so as to enable proper virtualization with x86.
+
+### Intel VT-x
+
+## Nesting
