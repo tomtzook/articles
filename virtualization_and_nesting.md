@@ -294,17 +294,23 @@ The following are the fields in the _VMCS_:
     host_rip = 0x6c16
 ```
 
-The following is a simplified the demonstration of a _VMM_ lifecycle
+The following is a simplified demonstration of a _VMM_ lifecycle
 
-<img width="556" height="641" alt="image" src="https://github.com/user-attachments/assets/c5c5002b-ab65-46ff-b524-d86a01cfd130" />
+<img width="537" height="696" alt="image" src="https://github.com/user-attachments/assets/33a30ff6-b7b3-4e43-9934-d84dad309b78" />
 
 The following shows the processor reaction to a guest trying to read an _MSR_ with _VT-x_
 
-<img width="490" height="491" alt="image" src="https://github.com/user-attachments/assets/65532ba2-a633-4567-b44f-46833ac5c57d" />
+<img width="535" height="706" alt="image" src="https://github.com/user-attachments/assets/1aa0beab-59cb-47e6-b0f9-3093d6422b54" />
 
-## Nesting
+## Nesting with Intel VT-x
 
 _Nested Virtualization_ is the ability to virtualize a _VMM_ which itself is virtualizing one or more _VM_, making the _VMM_ to be another _VM_. Just as a _VM_ expects specific behavior from the hardware which the _VMM_ has to emulate, so does a _VMM_ expect specific behavior.
+
+The _virtualized VMM_ itself is actually **unprivileged** in this situation. And although it may _think_ it is running a _VM_, it in fact does not do so directly. The only **privileged** _VMM_ is the one doing the nesting. So in reality both **L1** and **L2** are guests of **L0**. 
+
+<img width="547" height="250" alt="image" src="https://github.com/user-attachments/assets/4e422049-4f5f-46a0-9006-a18bec466a7f" />
+
+Thus, the general method of virtualization remains similar to standard practice. However, to properly virtualize a _VMM_ and its associated _VM_, the hypervisor must take care to emulate the relationship between the two, allowing the nested _VMM_ the illusion of control over the _VMs_, such that its emulation does affect the _VMs_, but still keeping it in **unprivileged** state.
 
 This creates 3 levels of _virtualization_:
 - **L0**: the underlying _VMM_, which interacts with the real hardware.
@@ -312,10 +318,6 @@ This creates 3 levels of _virtualization_:
 - **L2**: the guest machines for the virtualized _VMM_. 
 
 <img width="450" height="334" alt="image" src="https://github.com/user-attachments/assets/002b8b10-ae7f-49f6-af90-84bcfa52e5b5" />
-
-The _virtualized VMM_ itself is actually **unprivileged** in this situation. And although it may _think_ it is running a _VM_, it in fact does not do so directly. The only **privileged** _VMM_ is the one doing the nesting. So in reality both **L1** and **L2** are guests of **L0**. 
-
-<img width="547" height="250" alt="image" src="https://github.com/user-attachments/assets/4e422049-4f5f-46a0-9006-a18bec466a7f" />
 
 
 For _Intel VT-x_, this exact behavior is described rather precisely in _Intel's SDM Vol 3_.
