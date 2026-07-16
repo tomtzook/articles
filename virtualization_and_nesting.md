@@ -303,3 +303,20 @@ The following shows the processor reaction to a guest trying to read an _MSR_ wi
 <img width="490" height="491" alt="image" src="https://github.com/user-attachments/assets/65532ba2-a633-4567-b44f-46833ac5c57d" />
 
 ## Nesting
+
+_Nested Virtualization_ is the ability to virtualize a _VMM_ which itself is virtualizing one or more _VM_, making the _VMM_ to be another _VM_. Just as a _VM_ expects specific behavior from the hardware which the _VMM_ has to emulate, so does a _VMM_ expect specific behavior.
+
+This creates 3 levels of _virtualization_:
+- **L0**: the underlying _VMM_, which interacts with the real hardware.
+- **L1**: the virtualized _VMM_, thinking it is the real hypervisor.
+- **L2**: the guest machines for the virtualized _VMM_. 
+
+<img width="450" height="334" alt="image" src="https://github.com/user-attachments/assets/002b8b10-ae7f-49f6-af90-84bcfa52e5b5" />
+
+The _virtualized VMM_ itself is actually **unprivileged** in this situation. And although it may _think_ it is running a _VM_, it in fact does not do so directly. The only **privileged** _VMM_ is the one doing the nesting. So in reality both **L1** and **L2** are guests of **L0**. 
+
+<img width="547" height="250" alt="image" src="https://github.com/user-attachments/assets/4e422049-4f5f-46a0-9006-a18bec466a7f" />
+
+
+For _Intel VT-x_, this exact behavior is described rather precisely in _Intel's SDM Vol 3_.
+
