@@ -349,7 +349,7 @@ From there, the hypervisor switches to a reactive flow, receiving and reaponding
 
 All if these operations, which we can expect from **L1**, can be handled by properly emulating the relavent instructions and host<->guest transitions.
 
-**ADD DIAGRAM OF FLOW**.
+**ADD DIAGRAM OF FLOW**. Include l2<->l1 transition flow.
 
 This is generally the entirety of the flow. We must expect the switching of _VMCS_ and thus _VMs_ from **L1**, or the creation of new guests. Altough all of those operations are done with _VMX_ instructions.
 
@@ -385,10 +385,16 @@ Instead, work here focuses on the proper configuration of _vmcs02_, based on cha
 - _vmcs02_ host state = _vmcs01_ host state (if the same host entry is wanted as with **L1**).
 - _vmcs02_ control fields = mostly _vmcs12_ control fields, but slightly modified if a different behavior is desired.
 
+Once _vmcs02_ is ready, a simple _vmresume_ or _vmlaunch_ is enough to finish the transition. Do remember to restore the guest register values **as they were** in the exit from **L1**.
 
+**GO OVER SOME OF THE FIELDS THAT NEED WORK**.
 
 ### Emulating VMX Instructions
 
 ### Multi-Core Considerations 
+
+### Multiple L2 VMs
+
+Dealing with multiple **L2** guests may sound intimidating, but it is actually quite simple once a single **L2** works. Understand that in _VT-x_, the only thing seperating _VMs_ in the eyes of the hardware is the _VMCS_. A _VMM_ switching _VMs_ can either overwrite the current _VMCS_ with data for the other _VM_, or more commonly, switch _VMCS_ with _vmptrld_. Thus, for **L0** it is only necessay to keep track of the _current VMCS_, and recreate _vmcs02_ as a result of **L1** executing _vmwrite_ or _vmptrld_. This is assuming that **L0** is content to leave most of the _VM_ management to **L1**, something that would make sense when nesting.
 
 ### Extended Page Tables
