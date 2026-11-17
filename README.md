@@ -1,4 +1,3 @@
 # articles
 
-todo: virtualization and control theory stuff
-todo: make github pages
+A collection of articles I wrote for either my own use, or for lectures I gave. Maybe make it into github pages.
