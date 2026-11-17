@@ -320,5 +320,12 @@ This creates 3 levels of _virtualization_:
 <img width="450" height="334" alt="image" src="https://github.com/user-attachments/assets/002b8b10-ae7f-49f6-af90-84bcfa52e5b5" />
 
 
-For _Intel VT-x_, this exact behavior is described rather precisely in _Intel's SDM Vol 3_.
+For _Intel VT-x_, this exact behavior is described rather precisely in _Intel's SDM Vol 3C_ in the chapters discussing _Virtual Machine Control Structures_, _VM Entries_ and _VM Exits_.
 
+To keep control over the virtualization of **L2** guests, but also emulate the expected VM behavior by **L1**, it is necessary to track the _VMCS_ used by **L1**. However, keeping it **unpriviledged** requires that it will not directly touch the _real VMCS_. It is necessary, then, to create a _shadow VMCS_ for it, and track any changes it makes to it.
+_VT-x_ actually helps us in that regard, as executing _VMX_ instruction in a guest causes _vmexit_ with the relevant informstion. This gives us the perfect opportunity to emulate the relavent instructions to our liking. In the case of _VMCS_ instructions (_vmread_, _vmwrite_, _vmptrld_, _vmptrst_, _vmclear_) we can perform the emulation by working with our _shadow VMCS_, keeping the real one untouched.
+
+Because our _VMM_ is the only real _VMM_ (hardware wise), it will have to be the one actually running all the _VMs_. But in order to provide **L1** with the emulation of virtualization, with must consider its wanted behavior. This is where the _shadow VMCS_ comes into action. The _VMCS_ actually loaded when running **L2** is still ours, however it must be constructed based on both the _shadow VMCS_ (what **L1** wants) and our needs. This in turn makes for 3 _VMCS_:
+- The _VMCS_ we use to run **L1** - **vmcs01**
+- The _shadow VMCS_ - **vmcs12**
+- The _VMCS_ used to run **L2** - **vmcs02**; Built out of **vmcs12**.
