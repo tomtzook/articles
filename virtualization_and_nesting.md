@@ -329,3 +329,38 @@ Because our _VMM_ is the only real _VMM_ (hardware wise), it will have to be the
 - The _VMCS_ we use to run **L1** - **vmcs01**
 - The _shadow VMCS_ - **vmcs12**
 - The _VMCS_ used to run **L2** - **vmcs02**; Built out of **vmcs12**.
+
+Aside from the _VMCS_, nesting requires us to take care of two additional parts. First we must take care of emulating any behavior defined by the _VMCS_. Normally, if properly configured, this will be done by the hardware. But some instances will require our intervention. Among those are directing _vmexits_ into **L1** - as all exits actually go to us. Additinally, we must also emulate all _VMX_ instructions, not only those that deal with _VMCS_.
+
+### Flow
+
+Nesting flow is quite similar to how we run our own _VMM_, but looking from the perspective of hardware. It all surrounds the use of _VMX_ instructions.
+
+Recall the steps taking to initialize _VMM_:
+- Enter _VMX-root_ with _vmxon_.
+- Create _VMCS_ with _vmptrld_, _vmclear_ and _vmwrite_.
+- Launch first guest with _vmlaunch_.
+
+From there, the hypervisor switches to a reactive flow, receiving and reaponding to _vmexits_, which typically include:
+- Entry through the _VMCS_ defined _vmexit_ handler and saving guest registers.
+- Querying information on the exit from _VMCS_ with _vmread_.
+- Handling the exit, which typically include modifications to the _VMCS_ with _vmwrite_, or editing of the guest registers.
+- Returning to the guest with restoration of guest registers and _vmresume_.
+
+All if these operations, which we can expect from **L1**, can be handled by properly emulating the relavent instructions and host<->guest transitions.
+
+**ADD DIAGRAM OF FLOW**.
+
+This is generally the entirety of the flow. We must expect the switching of _VMCS_ and thus _VMs_ from **L1**, or the creation of new guests. Altough all of those operations are done with _VMX_ instructions.
+
+For our _VMM_, nesting does not exist until the first _vmxon_ from the guest. Until then, we're just a normal hypervisor dealing with our own _VMs_.
+
+### VMExits Into L1
+
+### VMEntries Into L2
+
+### Emulating VMX Instructions
+
+### Multi-Core Considerations 
+
+### Extended Page Tables
