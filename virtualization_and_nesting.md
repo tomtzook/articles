@@ -364,15 +364,28 @@ There is no one correct approach here, but it is generally advised to start by l
 
 **ADD FIGURE EXAMPLE FLOW FOR EXIT**
 
+**do example of control of different msrs and how to direct handling accordingly**
+
 Regardless, once it is decided to direct the exit into **L1**, it becomes necessary to emulate exit behavior into **L1**. Here, we must
 - Edit _vmcs01_ to reflect expected state of registers, msrs or others, in accordance with expected _vmexit_ behavior. Also involves infromation from _vmcs12's_ host state which should be configured in _vmcs01's_ guest state.
 - Edit _vmcs12's_ guest state and _vmexit_ fields with information about the exit, taken mostly from _vmcs02_.
 - Restore guest registers saved from **L2** to be collected by **L1** (as some registers are transferred between guest and host on transition)
 - And _vmresume_ into **L1**. 
 
-**DO EXAMPLE OF CARING ABOUT DIFFERENT MSRs**
+The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Exits"_. 
+
+**GO OVER SOME OF THE THINGS THAT MUST BE DONE**
 
 ### VMEntries Into L2
+
+In the other direction, a _vmlaunch_ or _vmresume_ from **L1** would require the entry into **L2**. Unlike with _vmexits_ though, there is no need to emulate the architectual behavior of _vmentry_, as **L0** needs to perform this itself to enter **L2** in any case.
+
+Instead, work here focuses on the proper configuration of _vmcs02_, based on changes made to _vmcs12_ as well as desired behavior by **L0**. Reconciling the two is an open question that can be approached in several ways. A good starting point is
+- _vmcs02_ guest state = _vmcs12_ guest state.
+- _vmcs02_ host state = _vmcs01_ host state (if the same host entry is wanted as with **L1**).
+- _vmcs02_ control fields = mostly _vmcs12_ control fields, but slightly modified if a different behavior is desired.
+
+
 
 ### Emulating VMX Instructions
 
