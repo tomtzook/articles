@@ -355,7 +355,22 @@ This is generally the entirety of the flow. We must expect the switching of _VMC
 
 For our _VMM_, nesting does not exist until the first _vmxon_ from the guest. Until then, we're just a normal hypervisor dealing with our own _VMs_.
 
-### VMExits Into L1
+### VMExits From L2
+
+Because our hypervisor is the actual host for **L2**, all _vmexits_ go through us. Since **L1** is the one meant to control **L2**, we must transfer atleast some of those into **L1**. This would require proper emulation of _vmexit_ behavior as defined by the architecture.
+
+Other than that, it is necessary to first determine which exits must be handled from **L0** and which from **L1** This is very dependent on how _vmcs02_ and _vmcs12_ are configured; Something decided by what kind of behavior each _VMM_ wants. 
+There is no one correct approach here, but it is generally advised to start by letting **L1** determine everything (where _vmcs02_ is almost identical to _vmcs12_) and handle everything (where all exits are transferred to **L1** for handling). From there, changes can made to give **L2** more control as needed (by both not directing all exits, and setting _vmcs02_ differently from _vmcs12_).
+
+**ADD FIGURE EXAMPLE FLOW FOR EXIT**
+
+Regardless, once it is decided to direct the exit into **L1**, it becomes necessary to emulate exit behavior into **L1**. Here, we must
+- Edit _vmcs01_ to reflect expected state of registers, msrs or others, in accordance with expected _vmexit_ behavior. Also involves infromation from _vmcs12's_ host state which should be configured in _vmcs01's_ guest state.
+- Edit _vmcs12's_ guest state and _vmexit_ fields with information about the exit, taken mostly from _vmcs02_.
+- Restore guest registers saved from **L2** to be collected by **L1** (as some registers are transferred between guest and host on transition)
+- And _vmresume_ into **L1**. 
+
+**DO EXAMPLE OF CARING ABOUT DIFFERENT MSRs**
 
 ### VMEntries Into L2
 
