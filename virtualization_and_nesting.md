@@ -395,7 +395,7 @@ Once _vmcs02_ is ready, a simple _vmresume_ or _vmlaunch_ is enough to finish th
 
 With the advent of more cores in processors, it is impossible to ignore the complexities of handling all these cores. Luckily however, _VMX_ is handled separately on each core, with each having its own state, _VMCS_, execution flow and such. A bare-bones _VMM_, can then handle each core on its own without much regards to the others. As long as the states and operations made affect only the current core, no manner if synchronization is necessary.
 
-Moreover, when it comes to nesting, any manner of cross processor interaction - namely external interrupts, can be left to **L1** to handle (for the most part). **L0** still needs to address such things when occuring **in L1**, but can defer handling when it comes to **L0**. When considering **equivelence**, doing so is actually preferred - to maintain transparency to **L1**.
+Moreover, when it comes to nesting, any manner of cross processor interaction - namely external interrupts, can be left to **L1** to handle (for the most part). **L0** still needs to address such things when occuring **in L1**, but can defer handling when it comes to **L2**. When considering **equivelence**, doing so is actually preferred - to maintain transparency to **L1**.
 
 As such, other the. having to maintain several per-core structures (like _VMCS_), and handling each core independently, multi-core may not be felt much. Only when **L0** introduces shared structures and operations, does synchronization need to be addressed. How is very much dependent on the exact nature of operation, structure or its usage.
 
