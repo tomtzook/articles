@@ -393,6 +393,12 @@ Once _vmcs02_ is ready, a simple _vmresume_ or _vmlaunch_ is enough to finish th
 
 ### Multi-Core Considerations 
 
+With the advent of more cores in processors, it is impossible to ignore the complexities of handling all these cores. Luckily however, _VMX_ is handled separately on each core, with each having its own state, _VMCS_, execution flow and such. A bare-bones _VMM_, can then handle each core on its own without much regards to the others. As long as the states and operations made affect only the current core, no manner if synchronization is necessary.
+
+Moreover, when it comes to nesting, any manner of cross processor interaction - namely external interrupts, can be left to **L1** to handle (for the most part). **L0** still needs to address such things when occuring **in L1**, but can defer handling when it comes to **L0**. When considering **equivelence**, doing so is actually preferred - to maintain transparency to **L1**.
+
+As such, other the. having to maintain several per-core structures (like _VMCS_), and handling each core independently, multi-core may not be felt much. Only when **L0** introduces shared structures and operations, does synchronization need to be addressed. How is very much dependent on the exact nature of operation, structure or its usage.
+
 ### Multiple L2 VMs
 
 Dealing with multiple **L2** guests may sound intimidating, but it is actually quite simple once a single **L2** works. Understand that in _VT-x_, the only thing seperating _VMs_ in the eyes of the hardware is the _VMCS_. A _VMM_ switching _VMs_ can either overwrite the current _VMCS_ with data for the other _VM_, or more commonly, switch _VMCS_ with _vmptrld_. Thus, for **L0** it is only necessay to keep track of the _current VMCS_, and recreate _vmcs02_ as a result of **L1** executing _vmwrite_ or _vmptrld_. This is assuming that **L0** is content to leave most of the _VM_ management to **L1**, something that would make sense when nesting.
