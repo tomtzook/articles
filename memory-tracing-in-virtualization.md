@@ -1,5 +1,3 @@
-discuss different techniques and utilization for memory tracing (with page protection mechanisms) for virtualization in x86.
-
 # Memory Tracing in Virtualization
 
 In virtualization, it is often necessary to track the _VM's_ wanted hardware state, without necessarily committing it into actual hardware, as to control the real behavior, but allow the _VM_ to indirectly influence it so that it gets the behavior it is expecting.
@@ -11,7 +9,9 @@ This brings us to a technique called _memory tracing_, which was used quite effe
 
 In this text we will be discussing how to implement this technique in various forms and look at some examples for its possible usage. We will be mainly dealing with _x86_ and _Intel's VT-x_, although the same can be replicated on other hardwares with some modification.
 
-## Preface: The Extended Page Table
+## EPT-Based Tracing
+
+### Preface: The Extended Page Table
 
 _Intel's_ solution for hardware virtualization of the _MMU_ brings another dimension into the translation of virtual address to physical addresses, whereby guest physical addresses are no longer considered the actual physical addresses, but rather a guest-specific abstraction which must be translated through another level - the _EPT_ - to get the physical address to be used. This is, of course, completely transparent to the guest which still uses its _Page Table_ and believes its physical addresses are the ones used to access the memory space. Adding another translation dimension to the _MMU_ does bring an overhead with it, but being implemented in hardware helps alleviate the strain, but more importantly, it doesn't need a constant intervention from the _VMM_ to function. 
 
@@ -19,7 +19,7 @@ Thus, a _VMM_ merely needs to construct, configure and maintain the _EPT_ struct
 
 For a complete understanding on structure, use and behavior, see _Intel Software Development Manual Vol. 3C "VMX Support for Address Translation"_.
 
-### Structure
+#### Structure
 
 A single _EPT_ is composed out of 4 levels of translation
 - The _Page Mapping Level 4_ (_PML4_) is the highest level. There is only one _PML4_, which consists of 512 entries (_PML4e_), each capable of mapping 512 GB of memory. Each entry is 8 bytes long and contains of configuration bits like permissions, and a _Page Frame Number_ pointing at the next level structure.
@@ -34,14 +34,14 @@ Some configuration bits that an entry can contain include
 - Guest Paging control in the memory region.
 - And more.
 
-### Violations
+#### Violations
 
 Like _Page Tables_ and _Page Faults_, _EPT_ can trigger _EPT Violations_ exits into the _VMM_ when the guest attempts a memory access which violates the configuration bits, discovered in the _MMU_ when translating the address (or through the _TLB_). There are 3 basic reasons for such violations (not including subtle implementation details and more specialized violations like shadow-stack).
 - Read attempt to a page with the read bit cleared in any of the entries in the hierarchy of translation.
 - Write attempt to a page with the write bit cleared in any of the entries in the hierarchy of translation.
 - Execute attempt to a page with the execute bit cleared in any of the entries in the hierarchy of translation.
 
-## Tracing
+### Tracing
 
 discuss:
 - different types of tracing (watchpoint, ?)
@@ -52,7 +52,7 @@ discuss:
 
 For tracing to be possible, we must have some sort of indication, a trap, to the action we seek to trace. This could be a _vmexit_, giving the _VMM_ running context to address this. For basic tracing conditions like on memory read, write or execute, it is possible to leverage the protection bits of _EPT_ entries, making it trigger a violation which will cause an exit. Utilizing the hardware as the trigger for our trace makes the job much much simpler - no memory need be modified to achieve the most basic traps. We will refer to these as _Watchpoints_ triggered based on permission condition.
 
-### Continuing After Trace
+#### Continuing After Trace
 
 After receive the trace exit and handling it as wanted, the core must proceed with execution. Resuming the guest simply executes the instruction again, causing the same violation again.
 
@@ -64,6 +64,14 @@ Permissions could also be given back to the page after the trace. Resuming the g
 - Set the _Monitor Trap Flag_ setting before executing the instruction again. After the instruction an _MTF_ exit will be triggered, giving us the context we need to remove the permissions again. Though this both has a performance cost due to the additional exit; Which is minor, given, but on time-sensitive or highly used guest code this may be unacceptable.
 - Adding permissions for a period and revoking is problematic in a multi-core machine sharing the _EPT_ between cores. But this will be discussed later.
 
-### Granularity
+#### Granularity
 
-### Multi-Core Considerations
+The smallest region of memory that can be controller is a single _Small Page_ of 4k bytes. This inherently means that any permission changes to install the trace would affect the entire page. Traces that encompass a whole page can easily work with this, but anything with a finer granularity becomes difficult, though not impossible.
+
+When a smaller part of a page is the target of a trace, altering the permissions for the entire page is unavoidable using the _EPT_ approach. Any violations that occur for the trace region can be handled as normal, but violations from the rest of the page could also occur. In such cases, it is possible to simply not trigger the trace handling and invoke the continuation logic (as discussed in the previous section). It unfortunately means that we can expect a drop in performance caused by the exits triggered on the rest of the page, dictated by the amount of access to the page, but functionally it would work.
+
+#### Multi-Core Considerations
+
+### Tracer Design
+
+**use flow diagrams and discuss a recommended option for a tracer design based on the earlier section**
