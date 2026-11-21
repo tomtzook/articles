@@ -399,7 +399,7 @@ The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chap
 
 ### Emulating VMX Instructions
 
-Part of a good nesting implementation lies in the proper emulation of the _vmx_ instructions an **L1** would have to use. This does not mean invocation of the real instructions, as the only real _VMM_ is supposed to be **L0**, but rather the illusion of that through an _equivalent_ behavior. **TODO: MORE ON THIS**
+Part of a good nesting implementation lies in the proper emulation of the _vmx_ instructions an **L1** would have to use. This does not mean invocation of the real instructions, as the only real _VMM_ is supposed to be **L0**, but rather the illusion of that through an _equivalent_ behavior. This may not seem like a lot of work, but it is actually a cornerstone of the implementation.
 
 The following was taken from _Intel SDM Vol. 3C Chapter "VMX Instruction Reference"_ and illustrates the exact behavior of _vmxon_.
 
@@ -427,7 +427,7 @@ flow
 
 <img width="869" height="721" alt="image" src="https://github.com/user-attachments/assets/e5232682-3a8f-4cca-9e7d-99cc119cc206" />
 
-One can quickly understand that because so many actions revolve around these instructions, we can do a lot of the nesting work by handling them properly.
+One can quickly understand that because so many actions revolve around these instructions, we can do a lot of the nesting work by handling them properly: we do not need to guess when a guest is being switched, or when the _VMCS_ is being edited, we will be told precisely that by **L1**.
 
 ### Multi-Core Considerations 
 
