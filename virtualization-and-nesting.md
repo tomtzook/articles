@@ -403,8 +403,6 @@ Once _vmcs02_ is ready, a simple _vmresume_ or _vmlaunch_ is enough to finish th
 
 The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Entry"_.
 
-**GO OVER SOME OF THE FIELDS THAT NEED WORK**.
-
 ### Emulating VMX Instructions
 
 Part of a good nesting implementation lies in the proper emulation of the _vmx_ instructions an **L1** would have to use. This does not mean invocation of the real instructions, as the only real _VMM_ is supposed to be **L0**, but rather the illusion of that through an _equivalent_ behavior. This may not seem like a lot of work, but it is actually a cornerstone of the implementation.
