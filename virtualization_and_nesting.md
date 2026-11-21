@@ -380,7 +380,15 @@ Regardless, once it is decided to direct the exit into **L1**, it becomes necess
 
 The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Exit"_. 
 
-**GO OVER SOME OF THE THINGS THAT MUST BE DONE**
+Let us examine some of the fields that we would have to work with, as an example:
+- _vmcs01(GUEST_CR0)_ = _vmcs12(HOST_CR0)_
+- _vmcs01(GUEST_CR4)_ = _vmcs12(HOST_CR4)_
+- _vmcs01(GUEST_CR3)_ = _vmcs12(HOST_CR3)_
+- _vmcs12(GUEST_RIP)_ = _vmcs02(GUEST_RIP)_
+- _vmcs12(GUEST_RSP)_ = _vmcs02(GUEST_RSP)_
+- _vmcs12(GUEST_EFER)_ = _vmcs02(GUEST_EFER)_, only if controls indicate to store _EFER_ on exit.
+
+The example above illustrates the general idea, but with a note that some fields are not to be just copied as is, but rather one must consult the right behavior with the defined controls. 
 
 ### VM Entries Into L2
 
