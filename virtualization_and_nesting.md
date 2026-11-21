@@ -347,13 +347,15 @@ From there, the hypervisor switches to a reactive flow, receiving and reaponding
 - Handling the exit, which typically include modifications to the _VMCS_ with _vmwrite_, or editing of the guest registers.
 - Returning to the guest with restoration of guest registers and _vmresume_.
 
-All of these operations, which we can expect from **L1**, can be handled by properly emulating the relavent instructions and host<->guest transitions.
+All of these operations, which we can expect from **L1**, can be handled by properly emulating the relevant instructions and host<->guest transitions.
 
-**ADD DIAGRAM OF FLOW**. Include l2<->l1 transition flow.
-
-This is generally the entirety of the flow. We must expect the switching of _VMCS_ and thus _VMs_ from **L1**, or the creation of new guests. Altough all of those operations are done with _VMX_ instructions.
+This is generally the entirety of the flow. We must expect the switching of _VMCS_ and thus _VMs_ from **L1**, or the creation of new guests. Although all of those operations are done with _VMX_ instructions.
 
 For our _VMM_, nesting does not exist until the first _vmxon_ from the guest. Until then, we're just a normal hypervisor dealing with our own _VMs_.
+
+The following illustrates the process of handling the startup and creation of **L2** by **L1**
+
+<img width="1052" height="743" alt="image" src="https://github.com/user-attachments/assets/3ddf2ead-bf4f-4c94-ae8c-9eb45b8434ab" />
 
 ### VM Exits From L2
 
@@ -364,11 +366,11 @@ There is no one correct approach here, but it is generally advised to start by l
 
 The following illustrates the flow for handling _vmexits_ from **L2** with **L1**
 
-<img width="662" height="285" alt="image" src="https://github.com/user-attachments/assets/7124496b-c165-4520-bff1-cd56e36ba15c" />
+<img width="1138" height="484" alt="image" src="https://github.com/user-attachments/assets/3b587a1f-d4d3-42d5-8bc0-6e791c41e239" />
 
 The following illustrates flow for handling an exiting _rdmsr_ with **L1**
 
-<img width="700" height="324" alt="image" src="https://github.com/user-attachments/assets/429a75a9-ce0e-4e0d-b82f-fb4e24417063" />
+<img width="1610" height="710" alt="image" src="https://github.com/user-attachments/assets/f98ccbae-2bed-4c58-b67b-b69b7d1d29cd" />
 
 Regardless, once it is decided to direct the exit into **L1**, it becomes necessary to emulate exit behavior into **L1**. Here, we must
 - Edit _vmcs01_ to reflect expected state of registers, msrs or others, in accordance with expected _vmexit_ behavior. Also involves infromation from _vmcs12's_ host state which should be configured in _vmcs01's_ guest state.
@@ -376,7 +378,7 @@ Regardless, once it is decided to direct the exit into **L1**, it becomes necess
 - Restore guest registers saved from **L2** to be collected by **L1** (as some registers are transferred between guest and host on transition)
 - And _vmresume_ into **L1**. 
 
-The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Exits"_. 
+The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Exit"_. 
 
 **GO OVER SOME OF THE THINGS THAT MUST BE DONE**
 
@@ -391,9 +393,41 @@ Instead, work here focuses on the proper configuration of _vmcs02_, based on cha
 
 Once _vmcs02_ is ready, a simple _vmresume_ or _vmlaunch_ is enough to finish the transition. Do remember to restore the guest register values **as they were** in the exit from **L1**.
 
+The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Entry"_.
+
 **GO OVER SOME OF THE FIELDS THAT NEED WORK**.
 
 ### Emulating VMX Instructions
+
+Part of a good nesting implementation lies in the proper emulation of the _vmx_ instructions an **L1** would have to use. This does not mean invocation of the real instructions, as the only real _VMM_ is supposed to be **L0**, but rather the illusion of that through an _equivalent_ behavior. **TODO: MORE ON THIS**
+
+The following was taken from _Intel SDM Vol. 3C Chapter "VMX Instruction Reference"_ and illustrates the exact behavior of _vmxon_.
+
+<img width="1003" height="749" alt="image" src="https://github.com/user-attachments/assets/62d54f60-9b83-499c-894e-9a7181bb40a6" />
+
+When emulating this instruction, we seek to create an almost identical behavior, which can be translated to the following flow
+
+<img width="876" height="743" alt="image" src="https://github.com/user-attachments/assets/be31b40e-0008-44ba-939b-43fc7e367319" />
+
+Only that instead of really doing _vmxon_ (because it was already done by **L0**) we merely saved information and set ourselves up to the incoming execution of **L1** and eventually **L2**. The correctness checks, although tedious, must not be ignored for true transparency. It is even possible for some _VMM_ implementations to actually test this correct behavior - e.g. trying to do _vmread_ on a field and expecting failure if the field is actually not readable.
+
+Let us look at _vmptrld_ as another example
+
+<img width="869" height="380" alt="image" src="https://github.com/user-attachments/assets/7765cfad-28ff-4cd7-8fa2-5819dff47fc5" />
+
+with the flow being
+
+<img width="994" height="727" alt="image" src="https://github.com/user-attachments/assets/31ac12ce-fe0f-40fd-9999-7fb3b26564d4" />
+
+And _vmwrite_
+
+<img width="1035" height="470" alt="image" src="https://github.com/user-attachments/assets/d1a172cc-b993-413e-ba08-782ef36460cb" />
+
+flow 
+
+<img width="869" height="721" alt="image" src="https://github.com/user-attachments/assets/e5232682-3a8f-4cca-9e7d-99cc119cc206" />
+
+One can quickly understand that because so many actions revolve around these instructions, we can do a lot of the nesting work by handling them properly.
 
 ### Multi-Core Considerations 
 
