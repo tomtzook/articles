@@ -469,4 +469,10 @@ One difficult task is tracking changes made to _ept12_ to adapt _ept02_ accordin
 - One could entrust that **L1** will invoke _invept_ or _invvpid_ after altering it. This would make sense, but might not be guaranteed depending on the implementation of **L1**. This also does not say what has changed, but one could scan the changes manually from the root of the _EPT_.
 - Memory tracing on the pages holding the _EPT_ structures (with _ept01_) is another approach. Any write attempts would trigger a violation on the page, telling of the change. One could respond to each edit manually, though that would have a huge overhead. Instead, catching the first write, turning off trace and only scanning _ept12_ on a _vmresume_ would nullify this overhead. A good scanning algorithm and cache could be devised to make locating the changes far easier.
 
+For reconciliation, a lazy approach could be taken. One that attempts to utilize _ept12_ entries instead of copying the entire _EPT_. 
+
+<img width="1215" height="802" alt="image" src="https://github.com/user-attachments/assets/892c2714-267c-46aa-896d-ee35be60e212" />
+
+Creating only a _PML4_ for _ept02_ and pointing all the entries to the _PDPTs_ of _ept12_ is a good starting configuration. This already reduces the need to scan changes to most of _ept12_. When a specific branch needs to be changed for some **L0** reason, a divergence can occur from _ept12_, creating new entries to replace **only** that branch. Here, tracing would have to be set for the original branch to track any changes in case the branch must be altered in some way that **L2** would depend on.
+
 ### Performance
