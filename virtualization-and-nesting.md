@@ -476,3 +476,24 @@ For reconciliation, a lazy approach could be taken. One that attempts to utilize
 Creating only a _PML4_ for _ept02_ and pointing all the entries to the _PDPTs_ of _ept12_ is a good starting configuration. This already reduces the need to scan changes to most of _ept12_. When a specific branch needs to be changed for some **L0** reason, a divergence can occur from _ept12_, creating new entries to replace **only** that branch. Here, tracing would have to be set for the original branch to track any changes in case the branch must be altered in some way that **L2** would depend on.
 
 ### Performance
+
+Despite utilizing as much as possible when it comes to hardware support, this nesting approach still adds quite a significant overhead compared to non-nested virtualization. Consider that for each **L2** exit that must be handled by **L1**, instead of one exit from **L2** to **L1** and one entry from **L1** to **L2**, we get
+- exit from **L2** to **L0**.
+- _vmcs12_ and _vmcs01_ updates as necessary.
+- entry from **L0** to **L1**.
+- **L1** does its stuff, which could include multiple exits to **L0** (especially for _vmx_ instructions like reading _VMCS_) and back to **L1**.
+- eventually last exit to **L0** with _vmresume_.
+- _vmcs02_ updates as necessary.
+- and entry back to **L2**.
+
+This is a few orders of magnitude more work than without nesting, especially because of all the exits that may be caused by **L1** during its **L2** handling. It is possible to find ways to eliminate some of this overhead with various techniques, but it is very unlikely to eliminate all of it.
+- Much of the overhead would likely be attributed to _vmwrite_ and _vmread_ done by **L1**. It is possible to seek an approach to eliminate such instructions with some forms of binary translation and perhaps patching **L1** code so that instead of doing the instruction, it would simply write/read to/from the memory region containing _vmcs12_.
+  - For example, on first time some instruction causes an exit for one of those reasons, it is possible to replace it with a trampoline (_jmp_ basically) to another region that will do the read/write to memory and _jmp_ back. No exit whatsoever.
+-  In theory, one _could_ run translated **L1** code in **L0** instead of another hardware guest, relying on older software virtualization techniques to completely eliminate this guest and transitions from-to it.
+  - Though one should be careful not to let **L1** get to much privilege (running in _root_) since this could allow it to actually oust **L0** and replace it as the real _VMM_.
+
+## Recommended Reading
+
+- Much of the design for this nesting is based on the great work in [_The Turtles Project: Design and Implementation of Nested Virtualization_](https://www.usenix.org/legacy/event/osdi10/tech/full_papers/Ben-Yehuda.pdf)
+- For interleaving software virtualization approach, check out [_A Comparison of Hardware and Software Virtualization Techniques for x86 Virtualization_](https://dl.acm.org/doi/10.1145/1168857.1168860)
+- Of course, _Intel's Software Development Manual_ is a goldmine of information that should not be skipped. Volume 3C is especially pertinent to _VT-x_.
