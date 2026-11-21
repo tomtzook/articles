@@ -1,1 +1,1 @@
-a
+discuss the utility, design and implementation of binary translation in relation to virtualization in x86, and how it can be combined with todays hardware virtualization support for even more powerful results.
