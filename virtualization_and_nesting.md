@@ -347,7 +347,7 @@ From there, the hypervisor switches to a reactive flow, receiving and reaponding
 - Handling the exit, which typically include modifications to the _VMCS_ with _vmwrite_, or editing of the guest registers.
 - Returning to the guest with restoration of guest registers and _vmresume_.
 
-All if these operations, which we can expect from **L1**, can be handled by properly emulating the relavent instructions and host<->guest transitions.
+All of these operations, which we can expect from **L1**, can be handled by properly emulating the relavent instructions and host<->guest transitions.
 
 **ADD DIAGRAM OF FLOW**. Include l2<->l1 transition flow.
 
@@ -355,16 +355,20 @@ This is generally the entirety of the flow. We must expect the switching of _VMC
 
 For our _VMM_, nesting does not exist until the first _vmxon_ from the guest. Until then, we're just a normal hypervisor dealing with our own _VMs_.
 
-### VMExits From L2
+### VM Exits From L2
 
 Because our hypervisor is the actual host for **L2**, all _vmexits_ go through us. Since **L1** is the one meant to control **L2**, we must transfer atleast some of those into **L1**. This would require proper emulation of _vmexit_ behavior as defined by the architecture.
 
 Other than that, it is necessary to first determine which exits must be handled from **L0** and which from **L1** This is very dependent on how _vmcs02_ and _vmcs12_ are configured; Something decided by what kind of behavior each _VMM_ wants. 
 There is no one correct approach here, but it is generally advised to start by letting **L1** determine everything (where _vmcs02_ is almost identical to _vmcs12_) and handle everything (where all exits are transferred to **L1** for handling). From there, changes can made to give **L2** more control as needed (by both not directing all exits, and setting _vmcs02_ differently from _vmcs12_).
 
-**ADD FIGURE EXAMPLE FLOW FOR EXIT**
+The following illustrates the flow for handling _vmexits_ from **L2** with **L1**
 
-**do example of control of different msrs and how to direct handling accordingly**
+<img width="662" height="285" alt="image" src="https://github.com/user-attachments/assets/7124496b-c165-4520-bff1-cd56e36ba15c" />
+
+The following illustrates flow for handling an exiting _rdmsr_ with **L1**
+
+<img width="700" height="324" alt="image" src="https://github.com/user-attachments/assets/429a75a9-ce0e-4e0d-b82f-fb4e24417063" />
 
 Regardless, once it is decided to direct the exit into **L1**, it becomes necessary to emulate exit behavior into **L1**. Here, we must
 - Edit _vmcs01_ to reflect expected state of registers, msrs or others, in accordance with expected _vmexit_ behavior. Also involves infromation from _vmcs12's_ host state which should be configured in _vmcs01's_ guest state.
@@ -376,7 +380,7 @@ The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chap
 
 **GO OVER SOME OF THE THINGS THAT MUST BE DONE**
 
-### VMEntries Into L2
+### VM Entries Into L2
 
 In the other direction, a _vmlaunch_ or _vmresume_ from **L1** would require the entry into **L2**. Unlike with _vmexits_ though, there is no need to emulate the architectual behavior of _vmentry_, as **L0** needs to perform this itself to enter **L2** in any case.
 
@@ -406,3 +410,5 @@ Dealing with multiple **L2** guests may sound intimidating, but it is actually q
 Since when loading a _VMCS_ (_vmptrld_), the _VMM_ must provide a memory region to contain its data, it is possible to use this region to read and write fields as requested by **L1**. This approach allows **L0** to forgo maintaining multiple _vmcs02_ copies and trust this responsibility to **L1**, which must maintain one or more _vmcs12_. Something that would require copying from the new _vmcs12_ into _vmcs02_ when a guest is replaced. It is possible to avoid this by keeping a copy per _vmcs12_ and use its memory address as a sort of identifier, which would only require editing _vmcs02_ when _vmcs12_ is edited (_vmwrite_), but not when replaced (_vmptrld_). Either approach works, choosing is an exercise in balancing memory use (maintaining copies) and cpu usage (copying on switch).
 
 ### Extended Page Tables
+
+### Performance
