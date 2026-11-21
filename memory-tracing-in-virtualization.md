@@ -17,6 +17,8 @@ _Intel's_ solution for hardware virtualization of the _MMU_ brings another dimen
 
 Thus, a _VMM_ merely needs to construct, configure and maintain the _EPT_ structure - much like the _OS would do with a _Page Table_. The structure itself is even quite similar to a _Page Table_, using similar terminology and layout.
 
+For a complete understanding on structure, use and behavior, see _Intel Software Development Manual Vol. 3C "VMX Support for Address Translation"_.
+
 ### Structure
 
 A single _EPT_ is composed out of 4 levels of translation
@@ -32,9 +34,12 @@ Some configuration bits that an entry can contain include
 - Guest Paging control in the memory region.
 - And more.
 
-
-
 ### Violations
+
+Like _Page Tables_ and _Page Faults_, _EPT_ can trigger _EPT Violations_ exits into the _VMM_ when the guest attempts a memory access which violates the configuration bits, discovered in the _MMU_ when translating the address (or through the _TLB_). There are 3 basic reasons for such violations (not including subtle implementation details and more specialized violations like shadow-stack).
+- Read attempt to a page with the read bit cleared in any of the entries in the hierarchy of translation.
+- Write attempt to a page with the write bit cleared in any of the entries in the hierarchy of translation.
+- Execute attempt to a page with the execute bit cleared in any of the entries in the hierarchy of translation.
 
 ## Tracing
 
@@ -44,5 +49,21 @@ discuss:
 - continuing execution after trace (resume with emulation, single step, removal, redirection/trampoline or more)
 - quick violation handling
 - handling multiple cores (per-core ept, sync mechanisms, a middlepoint?)
+
+For tracing to be possible, we must have some sort of indication, a trap, to the action we seek to trace. This could be a _vmexit_, giving the _VMM_ running context to address this. For basic tracing conditions like on memory read, write or execute, it is possible to leverage the protection bits of _EPT_ entries, making it trigger a violation which will cause an exit. Utilizing the hardware as the trigger for our trace makes the job much much simpler - no memory need be modified to achieve the most basic traps. We will refer to these as _Watchpoints_ triggered based on permission condition.
+
+### Continuing After Trace
+
+After receive the trace exit and handling it as wanted, the core must proceed with execution. Resuming the guest simply executes the instruction again, causing the same violation again.
+
+Emulation of the faulting instructions in the _VMM_ is possible after handling the trace trigger, eventually resuming into the guest at the next instructions. Emulation is slow however, and can be difficult to implement given the complexity of the instruction set. But it does solve the issue, since the _VMM_ is not affected by the permissions in the _EPT_ the permissions do not need to be changed.
+
+Permissions could also be given back to the page after the trace. Resuming the guest at the instruction will execute it again and succeed. This is simpler and faster than emulation, but has a big issue: for the trace to continue functioning, permissions must be revoked again. Without some trigger that returns to the _VMM_, it cannot do this change. Several options stand here
+- Keep the permissions, essentially removing the trace. Single use traces can be enough in some cases, but it is not very useful.
+- Remove the permissions on the next _vmexit_ (any exit for any cause), essentially removing the trace temporarily. Although simple, the loss of tracking for an uncontrolled period of time renders the tracing not that effective.
+- Set the _Monitor Trap Flag_ setting before executing the instruction again. After the instruction an _MTF_ exit will be triggered, giving us the context we need to remove the permissions again. Though this both has a performance cost due to the additional exit; Which is minor, given, but on time-sensitive or highly used guest code this may be unacceptable.
+- Adding permissions for a period and revoking is problematic in a multi-core machine sharing the _EPT_ between cores. But this will be discussed later.
+
+### Granularity
 
 ### Multi-Core Considerations
