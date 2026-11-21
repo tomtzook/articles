@@ -487,6 +487,7 @@ Despite utilizing as much as possible when it comes to hardware support, this ne
 - and entry back to **L2**.
 
 This is a few orders of magnitude more work than without nesting, especially because of all the exits that may be caused by **L1** during its **L2** handling. It is possible to find ways to eliminate some of this overhead with various techniques, but it is very unlikely to eliminate all of it.
+- Exit and entry are very expensive operations. One cannot eliminate their cost, but reducing their amount is possible.
 - Much of the overhead would likely be attributed to _vmwrite_ and _vmread_ done by **L1**. It is possible to seek an approach to eliminate such instructions with some forms of binary translation and perhaps patching **L1** code so that instead of doing the instruction, it would simply write/read to/from the memory region containing _vmcs12_.
   - For example, on first time some instruction causes an exit for one of those reasons, it is possible to replace it with a trampoline (_jmp_ basically) to another region that will do the read/write to memory and _jmp_ back. No exit whatsoever.
 -  In theory, one _could_ run translated **L1** code in **L0** instead of another hardware guest, relying on older software virtualization techniques to completely eliminate this guest and transitions from-to it.
@@ -495,5 +496,5 @@ This is a few orders of magnitude more work than without nesting, especially bec
 ## Recommended Reading
 
 - Much of the design for this nesting is based on the great work in [_The Turtles Project: Design and Implementation of Nested Virtualization_](https://www.usenix.org/legacy/event/osdi10/tech/full_papers/Ben-Yehuda.pdf)
-- For interleaving software virtualization approach, check out [_A Comparison of Hardware and Software Virtualization Techniques for x86 Virtualization_](https://dl.acm.org/doi/10.1145/1168857.1168860)
+- For interleaving software virtualization techniques, check out [_A Comparison of Hardware and Software Virtualization Techniques for x86 Virtualization_](https://dl.acm.org/doi/10.1145/1168857.1168860)
 - Of course, _Intel's Software Development Manual_ is a goldmine of information that should not be skipped. Volume 3C is especially pertinent to _VT-x_.
