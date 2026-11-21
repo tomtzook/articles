@@ -41,7 +41,7 @@ Some configuration bits that an entry can contain include
 discuss:
 - different types of tracing (watchpoint, ?)
 - granularity of tracing
-- continuing execution after trace (resume with emulation, single step, removal or more)
+- continuing execution after trace (resume with emulation, single step, removal, redirection/trampoline or more)
 - quick violation handling
 - handling multiple cores (per-core ept, sync mechanisms, a middlepoint?)
 
