@@ -1,4 +1,4 @@
-# Virtualization
+# Virtualization and Nesting
 
 The concept of creating several _simulated_ and _isolated_ environment on top of a singel hardware was first demonstrated in 1960 by IBM, creating a thin layer of software called _hypervisor_. It promised the ability to
 - **Maximize resource utilization** of a single hardware by sharing them between different users.
