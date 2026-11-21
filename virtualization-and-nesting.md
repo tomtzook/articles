@@ -453,4 +453,20 @@ Since when loading a _VMCS_ (_vmptrld_), the _VMM_ must provide a memory region 
 
 ### Extended Page Tables
 
+The _Extended Page Tables_ are _Intel's_ answer for hardware support for _MMU_ virtualization. They provide another dimension to address translation, where the _Guest Physical Address_ is not the _actual (host) physical address_. They take a format very similar to _Page Tables_, with the same levels but slightly different entry structure.
+
+Any _VMM_ that wishes may create an _EPT_ structure and map it as desired, setting it in the _VMCS_ in the _ept_pointer_ field. Any memory accesses from the guest would go through the proper translation in the _MMU_ with it.
+
+When it comes to nesting, we observe a similar situation as with _VMCS_ and can defined 3 types of _EPT_:
+- _ept01_ is created by **L0** for running **L1**. It _can_ be identity-mapped (i.e. _guest physical_ = _host physical_).
+- _ept12_ is created by **L1** for running **L2** and setting it into _vmcs12_. How things are mapped are out of the control of **L0**, and making any assumptions about them (like that they are identities, use small pages, etc.) is problematic.
+- _ept02_ is the one used to _actually_ run **L2**. It can either be the same as _ept12_ (a deep copy is not a must, just using the same _ept pointer_ is sufficient for this) or be created out of _ept12_ with some specific modifications as desired by **L0**. 
+
+Creating a combined _ept02_ allows **L0** to have some manner of control over **L2**, when desired. It is not a simple task to reconcile the mapping wanted by **L1** and **L0**, mostly a matter of deciding on who get priority for each wanted mapping; Not too de-similar from reconciling _VMCS_ fields for _vmcs02_. 
+
+One difficult task is tracking changes made to _ept12_ to adapt _ept02_ accordingly. Failing to do so will break **L2** functionality. Unlike with _vmcs12_ there is not guaranteed exit as a result of the _EPT_ changes. There are several ways to handle this
+- One could rebuild _ept02_ when entering back into **L2** each time. Though this is horribly in-efficient and would have terrible consequences for performance.
+- One could entrust that **L1** will invoke _invept_ or _invvpid_ after altering it. This would make sense, but might not be guaranteed depending on the implementation of **L1**. This also does not say what has changed, but one could scan the changes manually from the root of the _EPT_.
+- Memory tracing on the pages holding the _EPT_ structures (with _ept01_) is another approach. Any write attempts would trigger a violation on the page, telling of the change. One could respond to each edit manually, though that would have a huge overhead. Instead, catching the first write, turning off trace and only scanning _ept12_ on a _vmresume_ would nullify this overhead. A good scanning algorithm and cache could be devised to make locating the changes far easier.
+
 ### Performance
