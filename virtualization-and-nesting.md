@@ -390,6 +390,24 @@ The following illustrates the process of handling the startup and creation of **
 
 <img width="1052" height="743" alt="image" src="https://github.com/user-attachments/assets/3ddf2ead-bf4f-4c94-ae8c-9eb45b8434ab" />
 
+### Exposing Capabilities to **L1**
+
+As part of the start process of any hypervisor, one can expect queries regarding the capabilities of the hardware.
+These are used to determine supported features. 
+
+In the case of nesting, where _VMX_ is already active, there is need to at least keep an indication that the processor supports _VT-x_. 
+In addition, exposing which virtualization control are supported by **L0** is a great way to limit feature use and allow **L0** more control over what **L1**
+attempts to use. 
+
+Among the things that should be considered or looked at are
+- _cpuid.1h:ecx[31]_: shows if hypervisor is present.
+- _cpuid.1h:ecx[5]_: shows whether _VMX_ is supported.
+- _cr4.vmxe_: shows if _VMX_ is enabled. Needs to be turned on manually for **L1**.
+- _ia32_feature_control_ msr: to enable _VMX_ if not locked.
+- _VMX capability_ msrs: shows supported _VMX_ controls.
+
+It is possible to leave most as is, or expose something different. But the first 3 items should be explicitly addressed when running **L1**.
+
 ### VM Exits From L2
 
 Because our hypervisor is the actual host for **L2**, all _vmexits_ go through us. Since **L1** is the one meant to control **L2**, we must transfer atleast some of those into **L1**. 
