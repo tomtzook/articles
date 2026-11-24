@@ -446,8 +446,7 @@ The example above illustrates the general idea, but with a note that some fields
 
 ### VM Entries Into L2
 
-In the other direction, a _vmlaunch_ or _vmresume_ from **L1** would require the entry into **L2**. Unlike with _vmexits_ though, there is no need to emulate the architectual behavior of _vmentry_, 
-as **L0** needs to perform this itself to enter **L2** in any case.
+In the other direction, a _vmlaunch_ or _vmresume_ from **L1** would require the entry into **L2**. 
 
 Instead, work here focuses on the proper configuration of _vmcs02_, based on changes made to _vmcs12_ as well as desired behavior by **L0**. 
 Reconciling the two is an open question that can be approached in several ways. A good starting point is
