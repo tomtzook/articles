@@ -1,6 +1,6 @@
 # Virtualization and Nesting
 
-The concept of creating several _simulated_ and _isolated_ environment on top of a singel hardware was first demonstrated in 1960 by IBM, creating a thin layer of software called _hypervisor_. It promised the ability to
+The concept of creating several _simulated_ and _isolated_ environment on top of a singel hardware was first demonstrated in 1960s by IBM, creating a thin layer of software called _hypervisor_. It promised the ability to
 - **Maximize resource utilization** of a single hardware by sharing them between different users.
 - **Isolation of the environment**, providing data protection and execution stability (i.e. a failure in one environment will not affect others).
 
@@ -20,9 +20,11 @@ It can be pretty intuative to compare the architecture of _VMM_ and their relati
 
 <img width="739" height="252" alt="image" src="https://github.com/user-attachments/assets/5de57122-2e42-426d-8ab3-7f980a40aba5" />
 
-Essentially then, one can look at virtualization, as a means to multiplex a system to different users. This is what allows cloud computing to function, with a _VMM_ on a single server, running several _VM_ and ensuring they are isolated from one another. It is thus paramount for the _VMM_ to ensure that the virtualized hardware acts in a manner fitting the expectation of the _VM_. 
+Essentially then, one can look at virtualization, as a means to multiplex a system to different users. This is what allows cloud computing to function, 
+with a _VMM_ on a single server, running several _VM_ and ensuring they are isolated from one another. It is thus paramount for the _VMM_ to ensure that the virtualized hardware acts in a manner fitting the expectation of the _VM_. 
 
-Although recently, it has seen more and more applications for security of a machine, with the realization that the _kernel_ was not actually secure, some companies started pushing security mechanism one level lower, into an _hypervisor_. Microsoft's _Hyper-V_ and _Virtualization Based Security_ are prime examples.
+Although recently, it has seen more and more applications for security of a machine, with the realization that the _kernel_ was not actually secure, 
+some companies started pushing security mechanism one level lower, into an _hypervisor_. Microsoft's _Hyper-V_ and _Virtualization Based Security_ are prime examples.
 
 ## Virtualization Techniques
 
@@ -40,31 +42,53 @@ This leads to the _trap-and-emulate_ approach (also called _classic virtualizati
 
 We would call this _Hardware-Assisted Virtualization_, since it depends on the hardware providing the **trap** via its architectural behavior.
 
-An example for this would be the `lgdt` instruction, part of the x86 architecture. This instruction seeks to load a new _Global Descriptor Table_ into the processor. We would consider this instruction as **sensetive**, as it affects the behavior of memory access. In reality, we may not want the provided _GDT_ to be the real one. Luckily, `lgdt` is a privileged instruction, so its execution by the guest _VM_ will yield an _interrupt_ (`#GP(0)`). Our _VMM_ will receive this interrupt and choose what to really load.
+An example for this would be the `lgdt` instruction, part of the x86 architecture. This instruction seeks to load a new _Global Descriptor Table_ into the processor. We would consider this instruction as **sensitive**, 
+as it affects the behavior of memory access. In reality, we may not want the provided _GDT_ to be the real one. Luckily, `lgdt` is a privileged instruction, so its execution by the guest _VM_ will yield an _interrupt_ (`#GP(0)`). 
+Our _VMM_ will receive this interrupt and choose what to really load.
 
-From this example, one could understand that there may be a need for shadow structures. These structures are derived from the guest's structures (like _Page Tables_ and _Global Descriptor Table_). The guest may seek a specific memory mapping with physical memory, but because of the presence of more _VM_, the _VMM_ cannot give it free reign in mapping the physical memory. This would then require the _VMM_ to intercept the guest _Page Table_ and load another one in reality that can service all the present _VM_. This requires use of hardware page protection mechanism. This can be used to trap specific memory accesses that require emulation. Among these are _memory-mapped IO_ operations and hardware structure modification. When the guest modifies its _Page Table_, the _VMM_ must react appropriately to provide the guest with the expected virtual addresses. It would thus have to use page protection to force traps when the guest modifies its _Page Table_.
+From this example, one could understand that there may be a need for shadow structures. 
+These structures are derived from the guest's structures (like _Page Tables_ and _Global Descriptor Table_). 
+The guest may seek a specific memory mapping with physical memory, but because of the presence of more _VM_, 
+the _VMM_ cannot give it free reign in mapping the physical memory. This would then require the _VMM_ to intercept the guest _Page Table_ 
+and load another one in reality that can service all the present _VM_. This requires use of hardware page protection mechanism. This can be used to trap specific memory accesses that require emulation. 
+Among these are _memory-mapped IO_ operations and hardware structure modification. When the guest modifies its _Page Table_, the _VMM_ must react appropriately to provide the guest with the expected virtual addresses. It would thus have to use page protection to force traps when the guest modifies its _Page Table_.
 
 ### Software Virtualization
 
-However, not all _ISA_ fit these requirements. _x86_ is actually at fault as well. It features several **sensetive** instructions which are not **privileged**. One of these is `sgdt`, which reads the _GDT_. Considering the fact the we chose what _GDT_ to place when doing `lgdt`, the call to `sgdt` will allow the user to see the _real GDT_ instead of the one it thinks it loaded. This is a functional problem at its core, since the OS will expect a very specific _GDT_ and may not handle it properly when a different _GDT_ is retreived, breaking the **Equivalence** requirement.
+However, not all _ISA_ fit these requirements. _x86_ is actually at fault as well. It features several **sensitive** instructions which are not **privileged**. 
+One of these is `sgdt`, which reads the _GDTR_. Considering the fact the we chose what _GDT_ to place when doing `lgdt`, the call to `sgdt` will allow the user to see the _real GDT_ instead of the one it thinks it loaded. 
+This is a functional problem at its core, 
+since the OS will expect a very specific _GDT_ and may not handle it properly when a different _GDT_ is retreived, breaking the **Equivalence** requirement.
 
-Altering our approach, we could use an _interpreter_ to translate and catch all **sensetive** instructions and replacing them with a trap, or shadow structure when necessary. An example for this was done by _VMWare_, where they used _binary translation_ to translate the guest code so as to enable proper virtualization with x86. We would refer to this as _Software Virtualization_.
+Altering our approach, we could use an _interpreter_ to translate and catch all **sensitive** instructions and replacing them with a trap, or shadow structure when necessary. 
+An example for this was done by _VMWare_, where they used _binary translation_ to translate the guest code so as to enable proper virtualization with x86. We would refer to this as _Software Virtualization_.
 
-We could tackle `sgdt` as an example. Since this is a **sensetive** but non-privileged instruction, we must address it manually to acheive proper virtualization. When cosidering a translation approach, we may translate `sgdt eax` instruction into `mov eax, 0x0ff123`, where `0x0ff123` is the address of the "fake" _GDTR_ the guest is expecting. Thus the guest received the information it expected.
+We could tackle `sgdt` as an example. Since this is a **sensitive** but non-privileged instruction, we must address it manually to acheive proper virtualization. When cosidering a translation approach, we may translate `sgdt rax` instruction into
+
+```
+mov word ptr [rax], 0xff ; fake limit
+mov qword ptr [rax+2], 0x0ff123 ; fake base
+```
+
+Thus the guest received the information it expected.
 
 ### Intel VT-x
 
-To address the problems with virtualization in _x86_ both _Intel_ and _AMD_ released extensions to the architectures to fascilitate full hardware-assisted virtualization. For _Intel_, this came in the form of _VT-x_.
+To address the problems with virtualization in _x86_ both _Intel_ and _AMD_ released extensions to the architectures to fascilitate full hardware-assisted virtualization. 
+For _Intel_, this came in the form of _VT-x_.
 
 When in virtualization mode, the x86 processor as two new operating modes:
 - **root**: the _VMM_, esentially the new **privileged** mode.
 - **non-root**: the _guest_.
 
-When in **non-root** mode, certain instructions now trigger special virtualization behavior. This can come in the form of a **trap** (called **vmexit**), or a unique hardware behavior emulating real hardware behavior. Unlike previous _trap-and-emulate_ in x86, the hardware takes much more of the load, and what is considered **sensetive** has changed. 
+When in **non-root** mode, certain instructions now trigger special virtualization behavior. This can come in the form of a **trap** (called **vmexit**), 
+or a unique hardware behavior emulating real hardware behavior. Unlike previous _trap-and-emulate_ in x86, the hardware takes much more of the load, and what is considered **sensetive** has changed. 
 
-The processor uses the _Virtual Machine Control Structure_ to allow the _VMM_ to define virtualization behavior with the guest. Providing more find-grained control, while leveraging new hardware circuits to limit the need for the _VMM_ to perform emulation manually.
+The processor uses the _Virtual Machine Control Structure_ to allow the _VMM_ to define virtualization behavior with the guest. Providing more find-grained control, 
+while leveraging new hardware circuits to limit the need for the _VMM_ to perform emulation manually.
 
-One example for this is the new _Extended Page Tables_ added with the _Nehalem_ microarchitecture. This is an extension to the standard _Page Table_ and is integrated directly with the _MMU_. _VMM_ can use this to define the true virtual-physical memory mapping for each _guest_, removing the need to trace _Page Table_ modification in the guest. 
+One example for this is the new _Extended Page Tables_ added with the _Nehalem_ microarchitecture. This is an extension to the standard _Page Table_ and is integrated directly with the _MMU_. 
+_VMM_ can use this to define the true virtual-physical memory mapping for each _guest_, removing the need to trace _Page Table_ modification in the guest. 
 
 Thus, virtualization is done in two ways:
 - hardware assisted emulation, including things like APIC and IO virtualization. These are configured in the _VMCS_ by the _VMM_ before executing the guest.
@@ -304,13 +328,17 @@ The following shows the processor reaction to a guest trying to read an _MSR_ wi
 
 ## Nesting with Intel VT-x
 
-_Nested Virtualization_ is the ability to virtualize a _VMM_ which itself is virtualizing one or more _VM_, making the _VMM_ to be another _VM_. Just as a _VM_ expects specific behavior from the hardware which the _VMM_ has to emulate, so does a _VMM_ expect specific behavior.
+_Nested Virtualization_ is the ability to virtualize a _VMM_ which itself is virtualizing one or more _VM_, making the _VMM_ to be another _VM_. 
+Just as a _VM_ expects specific behavior from the hardware which the _VMM_ has to emulate, so does a _VMM_ expect specific behavior.
 
-The _virtualized VMM_ itself is actually **unprivileged** in this situation. And although it may _think_ it is running a _VM_, it in fact does not do so directly. The only **privileged** _VMM_ is the one doing the nesting. So in reality both **L1** and **L2** are guests of **L0**. 
+The _virtualized VMM_ itself is actually **unprivileged** in this situation. And although it may _think_ it is running a _VM_, 
+it in fact does not do so directly. The only **privileged** _VMM_ is the one doing the nesting. So in reality both **L1** and **L2** are guests of **L0**. 
 
 <img width="547" height="250" alt="image" src="https://github.com/user-attachments/assets/4e422049-4f5f-46a0-9006-a18bec466a7f" />
 
-Thus, the general method of virtualization remains similar to standard practice. However, to properly virtualize a _VMM_ and its associated _VM_, the hypervisor must take care to emulate the relationship between the two, allowing the nested _VMM_ the illusion of control over the _VMs_, such that its emulation does affect the _VMs_, but still keeping it in **unprivileged** state.
+Thus, the general method of virtualization remains similar to standard practice. However, to properly virtualize a _VMM_ and its associated _VM_, 
+the hypervisor must take care to emulate the relationship between the two, allowing the nested _VMM_ the illusion of control over the _VMs_, 
+such that its emulation does affect the _VMs_, but still keeping it in **unprivileged** state.
 
 This creates 3 levels of _virtualization_:
 - **L0**: the underlying _VMM_, which interacts with the real hardware.
@@ -322,15 +350,19 @@ This creates 3 levels of _virtualization_:
 
 For _Intel VT-x_, this exact behavior is described rather precisely in _Intel's SDM Vol 3C_ in the chapters discussing _Virtual Machine Control Structures_, _VM Entries_ and _VM Exits_.
 
-To keep control over the virtualization of **L2** guests, but also emulate the expected VM behavior by **L1**, it is necessary to track the _VMCS_ used by **L1**. However, keeping it **unpriviledged** requires that it will not directly touch the _real VMCS_. It is necessary, then, to create a _shadow VMCS_ for it, and track any changes it makes to it.
-_VT-x_ actually helps us in that regard, as executing _VMX_ instruction in a guest causes _vmexit_ with the relevant informstion. This gives us the perfect opportunity to emulate the relavent instructions to our liking. In the case of _VMCS_ instructions (_vmread_, _vmwrite_, _vmptrld_, _vmptrst_, _vmclear_) we can perform the emulation by working with our _shadow VMCS_, keeping the real one untouched.
+To keep control over the virtualization of **L2** guests, but also emulate the expected VM behavior by **L1**, it is necessary to track the _VMCS_ used by **L1**. However, 
+keeping it **unpriviledged** requires that it will not directly touch the _real VMCS_. It is necessary, then, to create a _shadow VMCS_ for it, and track any changes it makes to it.
+_VT-x_ actually helps us in that regard, as executing _VMX_ instruction in a guest causes _vmexit_ with the relevant informstion. This gives us the perfect opportunity to emulate the relavent instructions to our liking. 
+In the case of _VMCS_ instructions (_vmread_, _vmwrite_, _vmptrld_, _vmptrst_, _vmclear_) we can perform the emulation by working with our _shadow VMCS_, keeping the real one untouched.
 
 Because our _VMM_ is the only real _VMM_ (hardware wise), it will have to be the one actually running all the _VMs_. But in order to provide **L1** with the emulation of virtualization, with must consider its wanted behavior. This is where the _shadow VMCS_ comes into action. The _VMCS_ actually loaded when running **L2** is still ours, however it must be constructed based on both the _shadow VMCS_ (what **L1** wants) and our needs. This in turn makes for 3 _VMCS_:
 - The _VMCS_ we use to run **L1** - **vmcs01**
 - The _shadow VMCS_ - **vmcs12**
 - The _VMCS_ used to run **L2** - **vmcs02**; Built out of **vmcs12**.
 
-Aside from the _VMCS_, nesting requires us to take care of two additional parts. First we must take care of emulating any behavior defined by the _VMCS_. Normally, if properly configured, this will be done by the hardware. But some instances will require our intervention. Among those are directing _vmexits_ into **L1** - as all exits actually go to us. Additinally, we must also emulate all _VMX_ instructions, not only those that deal with _VMCS_.
+Aside from the _VMCS_, nesting requires us to take care of two additional parts. First we must take care of emulating any behavior defined by the _VMCS_. 
+Normally, if properly configured, this will be done by the hardware. But some instances will require our intervention. Among those are directing _vmexits_ into **L1** - as all exits actually go to us. 
+Additinally, we must also emulate all _VMX_ instructions, not only those that deal with _VMCS_.
 
 ### Flow
 
