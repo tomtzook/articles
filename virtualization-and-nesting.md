@@ -567,8 +567,10 @@ This is a few orders of magnitude more work than without nesting, especially bec
 - Exit and entry are very expensive operations. One cannot eliminate their cost, but reducing their amount is possible.
 - Much of the overhead would likely be attributed to _vmwrite_ and _vmread_ done by **L1**. It is possible to seek an approach to eliminate such instructions with some forms of binary translation and perhaps patching **L1** code so that instead of doing the instruction, it would simply write/read to/from the memory region containing _vmcs12_.
   - For example, on first time some instruction causes an exit for one of those reasons, it is possible to replace it with a trampoline (_jmp_ basically) to another region that will do the read/write to memory and _jmp_ back. No exit whatsoever.
+  - Hardware support for _shadow VMCS_ was added in the _Haswell_ micro architecture. Using it eliminates the read/write exits.
 -  In theory, one _could_ run translated **L1** code in **L0** instead of another hardware guest, relying on older software virtualization techniques to completely eliminate this guest and transitions from-to it.
   - Though one should be careful not to let **L1** get to much privilege (running in _root_) since this could allow it to actually oust **L0** and replace it as the real _VMM_.
+
 
 ## Recommended Reading
 
