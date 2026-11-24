@@ -381,7 +381,8 @@ From there, the hypervisor switches to a reactive flow, receiving and reaponding
 
 All of these operations, which we can expect from **L1**, can be handled by properly emulating the relevant instructions and host<->guest transitions.
 
-This is generally the entirety of the flow. We must expect the switching of _VMCS_ and thus _VMs_ from **L1**, or the creation of new guests. Although all of those operations are done with _VMX_ instructions.
+This is generally the entirety of the flow. We must expect the switching of _VMCS_ and thus _VMs_ from **L1**, 
+or the creation of new guests. Although all of those operations are done with _VMX_ instructions.
 
 For our _VMM_, nesting does not exist until the first _vmxon_ from the guest. Until then, we're just a normal hypervisor dealing with our own _VMs_.
 
@@ -391,10 +392,13 @@ The following illustrates the process of handling the startup and creation of **
 
 ### VM Exits From L2
 
-Because our hypervisor is the actual host for **L2**, all _vmexits_ go through us. Since **L1** is the one meant to control **L2**, we must transfer atleast some of those into **L1**. This would require proper emulation of _vmexit_ behavior as defined by the architecture.
+Because our hypervisor is the actual host for **L2**, all _vmexits_ go through us. Since **L1** is the one meant to control **L2**, we must transfer atleast some of those into **L1**. 
+This would require proper emulation of _vmexit_ behavior as defined by the architecture.
 
-Other than that, it is necessary to first determine which exits must be handled from **L0** and which from **L1** This is very dependent on how _vmcs02_ and _vmcs12_ are configured; Something decided by what kind of behavior each _VMM_ wants. 
-There is no one correct approach here, but it is generally advised to start by letting **L1** determine everything (where _vmcs02_ is almost identical to _vmcs12_) and handle everything (where all exits are transferred to **L1** for handling). From there, changes can made to give **L2** more control as needed (by both not directing all exits, and setting _vmcs02_ differently from _vmcs12_).
+Other than that, it is necessary to first determine which exits must be handled from **L0** and which from **L1** This is very dependent on how _vmcs02_ and _vmcs12_ are configured; 
+Something decided by what kind of behavior each _VMM_ wants. 
+There is no one correct approach here, but it is generally advised to start by letting **L1** determine everything (where _vmcs02_ is almost identical to _vmcs12_) and handle everything (where all exits are transferred to **L1** for handling). 
+From there, changes can made to give **L2** more control as needed (by both not directing all exits, and setting _vmcs02_ differently from _vmcs12_).
 
 The following illustrates the flow for handling _vmexits_ from **L2** with **L1**
 
@@ -424,20 +428,25 @@ The example above illustrates the general idea, but with a note that some fields
 
 ### VM Entries Into L2
 
-In the other direction, a _vmlaunch_ or _vmresume_ from **L1** would require the entry into **L2**. Unlike with _vmexits_ though, there is no need to emulate the architectual behavior of _vmentry_, as **L0** needs to perform this itself to enter **L2** in any case.
+In the other direction, a _vmlaunch_ or _vmresume_ from **L1** would require the entry into **L2**. Unlike with _vmexits_ though, there is no need to emulate the architectual behavior of _vmentry_, 
+as **L0** needs to perform this itself to enter **L2** in any case.
 
-Instead, work here focuses on the proper configuration of _vmcs02_, based on changes made to _vmcs12_ as well as desired behavior by **L0**. Reconciling the two is an open question that can be approached in several ways. A good starting point is
+Instead, work here focuses on the proper configuration of _vmcs02_, based on changes made to _vmcs12_ as well as desired behavior by **L0**. 
+Reconciling the two is an open question that can be approached in several ways. A good starting point is
 - _vmcs02_ guest state = _vmcs12_ guest state.
 - _vmcs02_ host state = _vmcs01_ host state (if the same host entry is wanted as with **L1**).
 - _vmcs02_ control fields = mostly _vmcs12_ control fields, but slightly modified if a different behavior is desired.
 
+It id a good idea to check the states and field to be valid according to the _vmentry checks_ and inject a failure to **L1** if they are not. This is the actual behavior of the instruction.
 Once _vmcs02_ is ready, a simple _vmresume_ or _vmlaunch_ is enough to finish the transition. Do remember to restore the guest register values **as they were** in the exit from **L1**.
 
 The exact behavior that must be replicated is defined in _Intel SDM Vol. 3C Chapter "VM Entry"_.
 
 ### Emulating VMX Instructions
 
-Part of a good nesting implementation lies in the proper emulation of the _vmx_ instructions an **L1** would have to use. This does not mean invocation of the real instructions, as the only real _VMM_ is supposed to be **L0**, but rather the illusion of that through an _equivalent_ behavior. This may not seem like a lot of work, but it is actually a cornerstone of the implementation.
+Part of a good nesting implementation lies in the proper emulation of the _vmx_ instructions an **L1** would have to use. 
+This does not mean invocation of the real instructions, as the only real _VMM_ is supposed to be **L0**, but rather the illusion of that through an _equivalent_ behavior. 
+This may not seem like a lot of work, but it is actually a cornerstone of the implementation.
 
 The following was taken from _Intel SDM Vol. 3C Chapter "VMX Instruction Reference"_ and illustrates the exact behavior of _vmxon_.
 
@@ -447,7 +456,9 @@ When emulating this instruction, we seek to create an almost identical behavior,
 
 <img width="876" height="743" alt="image" src="https://github.com/user-attachments/assets/be31b40e-0008-44ba-939b-43fc7e367319" />
 
-Only that instead of really doing _vmxon_ (because it was already done by **L0**) we merely saved information and set ourselves up to the incoming execution of **L1** and eventually **L2**. The correctness checks, although tedious, must not be ignored for true transparency. It is even possible for some _VMM_ implementations to actually test this correct behavior - e.g. trying to do _vmread_ on a field and expecting failure if the field is actually not readable.
+Only that instead of really doing _vmxon_ (because it was already done by **L0**) we merely saved information and set ourselves up to the incoming execution of **L1** and eventually **L2**. 
+The correctness checks, although tedious, must not be ignored for true transparency. It is even possible for some _VMM_ implementations to actually test this correct behavior - 
+e.g. trying to do _vmread_ on a field and expecting failure if the field is actually not readable.
 
 Let us look at _vmptrld_ as another example
 
@@ -469,21 +480,32 @@ One can quickly understand that because so many actions revolve around these ins
 
 ### Multi-Core Considerations 
 
-With the advent of more cores in processors, it is impossible to ignore the complexities of handling all these cores. Luckily however, _VMX_ is handled separately on each core, with each having its own state, _VMCS_, execution flow and such. A bare-bones _VMM_, can then handle each core on its own without much regards to the others. As long as the states and operations made affect only the current core, no manner if synchronization is necessary.
+With the advent of more cores in processors, it is impossible to ignore the complexities of handling all these cores. 
+Luckily however, _VMX_ is handled separately on each core, with each having its own state, _VMCS_, execution flow and such. 
+A bare-bones _VMM_, can then handle each core on its own without much regards to the others. As long as the states and operations made affect only the current core, no manner if synchronization is necessary.
 
-Moreover, when it comes to nesting, any manner of cross processor interaction - namely external interrupts, can be left to **L1** to handle (for the most part). **L0** still needs to address such things when occuring **in L1**, but can defer handling when it comes to **L2**. When considering **equivelence**, doing so is actually preferred - to maintain transparency to **L1**.
+Moreover, when it comes to nesting, any manner of cross processor interaction - namely external interrupts, can be left to **L1** to handle (for the most part).
+**L0** still needs to address such things when occuring **in L1**, but can inject into **L1** for handling when it comes to **L2**. When considering **equivelence**, 
+doing so is actually preferred - to maintain transparency to **L1**.
 
-As such, other the. having to maintain several per-core structures (like _VMCS_), and handling each core independently, multi-core may not be felt much. Only when **L0** introduces shared structures and operations, does synchronization need to be addressed. How is very much dependent on the exact nature of operation, structure or its usage.
+As such, other the. having to maintain several per-core structures (like _VMCS_), and handling each core independently, multi-core may not be felt much. Only when **L0** 
+introduces shared structures and operations, does synchronization need to be addressed. How is very much dependent on the exact nature of operation, structure or its usage.
 
 ### Multiple L2 VMs
 
-Dealing with multiple **L2** guests may sound intimidating, but it is actually quite simple once a single **L2** works. Understand that in _VT-x_, the only thing seperating _VMs_ in the eyes of the hardware is the _VMCS_. A _VMM_ switching _VMs_ can either overwrite the current _VMCS_ with data for the other _VM_, or more commonly, switch _VMCS_ with _vmptrld_. Thus, for **L0** it is only necessay to keep track of the _current VMCS_, and recreate _vmcs02_ as a result of **L1** executing _vmwrite_ or _vmptrld_. This is assuming that **L0** is content to leave most of the _VM_ management to **L1**, something that would make sense when nesting.
+Dealing with multiple **L2** guests may sound intimidating, but it is actually quite simple once a single **L2** works. Understand that in _VT-x_, the only thing seperating _VMs_ 
+in the eyes of the hardware is the _VMCS_. A _VMM_ switching _VMs_ can either overwrite the current _VMCS_ with data for the other _VM_, or more commonly, switch _VMCS_ with _vmptrld_. 
+Thus, for **L0** it is only necessay to keep track of the _current VMCS_, and recreate _vmcs02_ as a result of **L1** executing _vmwrite_ or _vmptrld_. This is assuming that **L0** is content to leave most of the _VM_ management to **L1**, 
+something that would make sense when nesting.
 
-Since when loading a _VMCS_ (_vmptrld_), the _VMM_ must provide a memory region to contain its data, it is possible to use this region to read and write fields as requested by **L1**. This approach allows **L0** to forgo maintaining multiple _vmcs02_ copies and trust this responsibility to **L1**, which must maintain one or more _vmcs12_. Something that would require copying from the new _vmcs12_ into _vmcs02_ when a guest is replaced. It is possible to avoid this by keeping a copy per _vmcs12_ and use its memory address as a sort of identifier, which would only require editing _vmcs02_ when _vmcs12_ is edited (_vmwrite_), but not when replaced (_vmptrld_). Either approach works, choosing is an exercise in balancing memory use (maintaining copies) and cpu usage (copying on switch).
+Since when loading a _VMCS_ (_vmptrld_), the _VMM_ must provide a memory region to contain its data, it is possible to use this region to read and write fields as requested by **L1**. 
+This approach allows **L0** to forgo maintaining multiple _vmcs02_ copies and trust this responsibility to **L1**, which must maintain one or more _vmcs12_. Something that would require copying from the new _vmcs12_ into _vmcs02_ when a guest is replaced. 
+It is possible to avoid this by keeping a copy per _vmcs12_ and use its memory address as a sort of identifier, which would only require editing _vmcs02_ when _vmcs12_ is edited (_vmwrite_), but not when replaced (_vmptrld_). Either approach works, choosing is an exercise in balancing memory use (maintaining copies) and cpu usage (copying on switch).
 
 ### Extended Page Tables
 
-The _Extended Page Tables_ are _Intel's_ answer for hardware support for _MMU_ virtualization. They provide another dimension to address translation, where the _Guest Physical Address_ is not the _actual (host) physical address_. They take a format very similar to _Page Tables_, with the same levels but slightly different entry structure.
+The _Extended Page Tables_ are _Intel's_ answer for hardware support for _MMU_ virtualization. They provide another dimension to address translation, where the _Guest Physical Address_ is not the _actual (host) physical address_. 
+They take a format very similar to _Page Tables_, with the same levels but slightly different entry structure.
 
 Any _VMM_ that wishes may create an _EPT_ structure and map it as desired, setting it in the _VMCS_ in the _ept_pointer_ field. Any memory accesses from the guest would go through the proper translation in the _MMU_ with it.
 
@@ -492,18 +514,20 @@ When it comes to nesting, we observe a similar situation as with _VMCS_ and can 
 - _ept12_ is created by **L1** for running **L2** and setting it into _vmcs12_. How things are mapped are out of the control of **L0**, and making any assumptions about them (like that they are identities, use small pages, etc.) is problematic.
 - _ept02_ is the one used to _actually_ run **L2**. It can either be the same as _ept12_ (a deep copy is not a must, just using the same _ept pointer_ is sufficient for this) or be created out of _ept12_ with some specific modifications as desired by **L0**. 
 
-Creating a combined _ept02_ allows **L0** to have some manner of control over **L2**, when desired. It is not a simple task to reconcile the mapping wanted by **L1** and **L0**, mostly a matter of deciding on who get priority for each wanted mapping; Not too de-similar from reconciling _VMCS_ fields for _vmcs02_. 
+Creating a combined _ept02_ allows **L0** to have some manner of control over **L2**, when desired. It is not a simple task to reconcile the mapping wanted by **L1** and **L0**, mostly a matter of deciding on who get priority for each wanted mapping; 
+Not too de-similar from reconciling _VMCS_ fields for _vmcs02_. 
 
 One difficult task is tracking changes made to _ept12_ to adapt _ept02_ accordingly. Failing to do so will break **L2** functionality. Unlike with _vmcs12_ there is not guaranteed exit as a result of the _EPT_ changes. There are several ways to handle this
 - One could rebuild _ept02_ when entering back into **L2** each time. Though this is horribly in-efficient and would have terrible consequences for performance.
 - One could entrust that **L1** will invoke _invept_ or _invvpid_ after altering it. This would make sense, but might not be guaranteed depending on the implementation of **L1**. This also does not say what has changed, but one could scan the changes manually from the root of the _EPT_.
 - Memory tracing on the pages holding the _EPT_ structures (with _ept01_) is another approach. Any write attempts would trigger a violation on the page, telling of the change. One could respond to each edit manually, though that would have a huge overhead. Instead, catching the first write, turning off trace and only scanning _ept12_ on a _vmresume_ would nullify this overhead. A good scanning algorithm and cache could be devised to make locating the changes far easier.
 
-For reconciliation, a lazy approach could be taken. One that attempts to utilize _ept12_ entries instead of copying the entire _EPT_. 
+For reconciliation, a lazy approach could be taken. One that attempts to utilize _ept12_ entries instead of copying the entire _EPT_. This is assuming that the physical addresses used by **L1** are the same as used **L0**.
 
 <img width="1215" height="802" alt="image" src="https://github.com/user-attachments/assets/892c2714-267c-46aa-896d-ee35be60e212" />
 
-Creating only a _PML4_ for _ept02_ and pointing all the entries to the _PDPTs_ of _ept12_ is a good starting configuration. This already reduces the need to scan changes to most of _ept12_. When a specific branch needs to be changed for some **L0** reason, a divergence can occur from _ept12_, creating new entries to replace **only** that branch. Here, tracing would have to be set for the original branch to track any changes in case the branch must be altered in some way that **L2** would depend on.
+Creating only a _PML4_ for _ept02_ and pointing all the entries to the _PDPTs_ of _ept12_ is a good starting configuration. This already reduces the need to scan changes to most of _ept12_. 
+When a specific branch needs to be changed for some **L0** reason, a divergence can occur from _ept12_, creating new entries to replace **only** that branch. Here, tracing would have to be set for the original branch to track any changes in case the branch must be altered in some way that **L2** would depend on.
 
 ### Performance
 
