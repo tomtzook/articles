@@ -69,7 +69,21 @@ For basic tracing conditions like on memory read, write or execute, it is possib
 Utilizing the hardware as the trigger for our trace makes the job much much simpler - no memory need be modified to achieve the most basic traps. We will refer to these as _Watchpoints_ 
 triggered based on permission condition.
 
-##### Continuing After Trace
+The smallest region of memory that can be controller is a single _Small Page_ of 4k bytes. This inherently means that any permission changes to install the trace would affect the entire page. Traces that encompass a whole page can easily work with this, 
+but anything with a finer granularity becomes difficult, though not impossible.
+
+When a smaller part of a page is the target of a trace, altering the permissions for the entire page is unavoidable using the _EPT_ approach. Any violations that occur for the trace region can be handled as normal, 
+but violations from the rest of the page could also occur. In such cases, it is possible to simply not trigger the trace handling and invoke the continuation logic (see "Continuing After Exiting Trace"). It unfortunately means that 
+we can expect a drop in performance caused by the exits triggered on the rest of the page, dictated by the amount of access to the page, but functionally it would work.
+
+_Watchpoints_ can be incredibly useful, not unlike setting something similar with a debugger, but driven by the _EPT_. Among the most useful cases include catching read or write to particular memory (say, _Page Table_). 
+Using _execute_ watch is also possible but has severe limitations due to granularity.
+
+#### Hooks
+
+#### Trampolines
+
+#### Continuing After Exiting Trace
 
 After receive the trace exit and handling it as wanted, the core must proceed with execution. Resuming the guest simply executes the instruction again, 
 causing the same violation again.
@@ -84,20 +98,7 @@ permissions must be revoked again. Without some trigger that returns to the _VMM
 - Set the _Monitor Trap Flag_ setting before executing the instruction again. After the instruction an _MTF_ exit will be triggered, giving us the context we need to remove the permissions again. Though this both has a performance cost due to the additional exit; Which is minor, given, but on time-sensitive or highly used guest code this may be unacceptable.
 - Adding permissions for a period and revoking is problematic in a multi-core machine sharing the _EPT_ between cores. But this will be discussed later.
 
-##### Granularity
-
-The smallest region of memory that can be controller is a single _Small Page_ of 4k bytes. This inherently means that any permission changes to install the trace would affect the entire page. Traces that encompass a whole page can easily work with this, 
-but anything with a finer granularity becomes difficult, though not impossible.
-
-When a smaller part of a page is the target of a trace, altering the permissions for the entire page is unavoidable using the _EPT_ approach. Any violations that occur for the trace region can be handled as normal, 
-but violations from the rest of the page could also occur. In such cases, it is possible to simply not trigger the trace handling and invoke the continuation logic (as discussed in the previous section). It unfortunately means that 
-we can expect a drop in performance caused by the exits triggered on the rest of the page, dictated by the amount of access to the page, but functionally it would work.
-
-##### Multi-Core Considerations
-
-#### Hooks
-
-#### Trampolines
+#### Multi-Core Considerations
 
 ## Tracer Design
 
