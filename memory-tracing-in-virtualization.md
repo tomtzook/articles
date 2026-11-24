@@ -58,11 +58,18 @@ discuss:
 - quick violation handling
 - handling multiple cores (per-core ept, sync mechanisms, a middlepoint?)
 
-For tracing to be possible, we must have some sort of indication, a trap, to the action we seek to trace. This could be a _vmexit_, giving the _VMM_ running context to address this. For basic tracing conditions like on memory read, write or execute, 
-it is possible to leverage the protection bits of _EPT_ entries, making it trigger a violation which will cause an exit. Utilizing the hardware as the trigger for our trace makes the job much much simpler - no memory need be modified to achieve the most basic traps. We will refer to these as _Watchpoints_ 
+For tracing to be possible, we must have some sort of indication, a trap, to the action we seek to trace. This could be a _vmexit_, giving the _VMM_ running context to address this, but other options are possible:
+- An _exit_ into root.
+- A hook or trampoline to code in the guest.
+- If response isn't needed on the event, then recording it for later observation opens more options. There are many mechanisms that may be of use for such cases: page modification logging, accessed and dirty flags, perhaps event _Intel PT_.
+
+#### Watchpoints
+
+For basic tracing conditions like on memory read, write or execute, it is possible to leverage the protection bits of _EPT_ entries, making it trigger a violation which will cause an exit. 
+Utilizing the hardware as the trigger for our trace makes the job much much simpler - no memory need be modified to achieve the most basic traps. We will refer to these as _Watchpoints_ 
 triggered based on permission condition.
 
-#### Continuing After Trace
+##### Continuing After Trace
 
 After receive the trace exit and handling it as wanted, the core must proceed with execution. Resuming the guest simply executes the instruction again, 
 causing the same violation again.
@@ -77,7 +84,7 @@ permissions must be revoked again. Without some trigger that returns to the _VMM
 - Set the _Monitor Trap Flag_ setting before executing the instruction again. After the instruction an _MTF_ exit will be triggered, giving us the context we need to remove the permissions again. Though this both has a performance cost due to the additional exit; Which is minor, given, but on time-sensitive or highly used guest code this may be unacceptable.
 - Adding permissions for a period and revoking is problematic in a multi-core machine sharing the _EPT_ between cores. But this will be discussed later.
 
-#### Granularity
+##### Granularity
 
 The smallest region of memory that can be controller is a single _Small Page_ of 4k bytes. This inherently means that any permission changes to install the trace would affect the entire page. Traces that encompass a whole page can easily work with this, 
 but anything with a finer granularity becomes difficult, though not impossible.
@@ -86,8 +93,12 @@ When a smaller part of a page is the target of a trace, altering the permissions
 but violations from the rest of the page could also occur. In such cases, it is possible to simply not trigger the trace handling and invoke the continuation logic (as discussed in the previous section). It unfortunately means that 
 we can expect a drop in performance caused by the exits triggered on the rest of the page, dictated by the amount of access to the page, but functionally it would work.
 
-#### Multi-Core Considerations
+##### Multi-Core Considerations
 
-### Tracer Design
+#### Hooks
+
+#### Trampolines
+
+## Tracer Design
 
 **use flow diagrams and discuss a recommended option for a tracer design based on the earlier section**
