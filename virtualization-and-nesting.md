@@ -488,8 +488,13 @@ Moreover, when it comes to nesting, any manner of cross processor interaction - 
 **L0** still needs to address such things when occuring **in L1**, but can inject into **L1** for handling when it comes to **L2**. When considering **equivelence**, 
 doing so is actually preferred - to maintain transparency to **L1**.
 
-As such, other the. having to maintain several per-core structures (like _VMCS_), and handling each core independently, multi-core may not be felt much. Only when **L0** 
+As such, other then having to maintain several per-core structures (like _VMCS_), and handling each core independently, multi-core may not be felt much. Only when **L0** 
 introduces shared structures and operations, does synchronization need to be addressed. How is very much dependent on the exact nature of operation, structure or its usage.
+
+One example for shared structure is the _EPT_. If **L0** used a single _EPT_ shared between the cores **and** actually modifies this after _launch_, it would need some manner if synchronization on each modification.
+Such synchronization can be achieved in one of two ways:
+- active: the core could send IPIs to other cores to get them to synchronize and flush TLB. Easiest to use is _NMI_ along with _nmi exiting_ set in the _VMCS_.
+- lazy: perform the synchronization on the next exit. Can be problematic since, for all intents and purposes the core won's see the changes until then. 
 
 ### Multiple L2 VMs
 
